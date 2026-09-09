@@ -23,7 +23,7 @@
 
 - Java 21を導入してコンパイル・テストを再実行する必要がある。
 - Dockerを導入・起動してTestcontainers、Flyway、Composeの実DB検証を行う必要がある。
-- Gitリモート未設定のため、まだpushしていない。
+- GitHub公開リポジトリ `https://github.com/unitier0214/expense-flow` を作成し、`main`へpush済み。
 
 ### 次のフェーズへの申し送り
 
