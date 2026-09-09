@@ -18,6 +18,8 @@
     <form method="post" th:action="${formAction}" class="panel expense-form">
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
         <input th:if="${isEdit}" type="hidden" name="version" th:value="${form.version}">
+        <p id="version-error" th:if="${fieldErrors.containsKey('version')}" class="field-error"
+           th:text="${fieldErrors['version']}" role="alert">versionエラー</p>
         <div class="form-field">
             <label for="title">件名</label>
             <input id="title" name="title" type="text" maxlength="100" required
