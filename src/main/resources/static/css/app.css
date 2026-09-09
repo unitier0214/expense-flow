@@ -33,7 +33,11 @@ label { display: block; font-weight: 700; margin-bottom: .35rem; }
 input, select, textarea { border: 1px solid #9fb3c8; border-radius: .4rem; font: inherit; padding: .65rem .75rem; width: 100%; }
 select { background: var(--white); }
 textarea { min-height: 8rem; resize: vertical; }
-input:focus { border-color: var(--navy); outline: 3px solid rgba(16, 42, 67, .2); }
+input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible {
+    border-color: var(--navy);
+    outline: 3px solid rgba(16, 42, 67, .2);
+    outline-offset: 2px;
+}
 .button { border: 0; border-radius: .4rem; cursor: pointer; display: inline-block; font: inherit; font-weight: 700; padding: .65rem 1rem; text-decoration: none; }
 .button-primary { background: var(--navy); color: var(--white); }
 .button-primary:hover { background: var(--navy-dark); }
@@ -86,6 +90,7 @@ th { color: var(--muted); font-size: .85rem; white-space: nowrap; }
 .approval-panel { display: grid; gap: 1rem; }
 .approval-form { border-top: 1px solid var(--border); padding-top: 1rem; }
 .approval-form .form-field { margin-bottom: .75rem; }
+.approval-form textarea { min-height: 6rem; }
 .error-panel { margin-top: 3rem; text-align: center; }
 .error-panel .button { margin-top: 1rem; }
 .narrow-shell { max-width: 720px; }
@@ -100,4 +105,6 @@ code { background: #eaf0f6; border-radius: .25rem; padding: .1rem .3rem; }
     .filter-actions { justify-content: flex-start; }
     .detail-grid { grid-template-columns: 1fr; }
     .detail-grid dt { margin-top: .4rem; }
+    .panel { padding: 1.1rem; }
+    .form-actions .button, .filter-actions .button { min-height: 2.75rem; }
 }

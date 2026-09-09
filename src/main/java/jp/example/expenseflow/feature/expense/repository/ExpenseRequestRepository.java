@@ -85,4 +85,6 @@ public interface ExpenseRequestRepository extends JpaRepository<ExpenseRequest, 
     @EntityGraph(attributePaths = {"applicant", "department"})
     @Query("select e from ExpenseRequest e where e.id = :id")
     Optional<ExpenseRequest> findWithRelationsById(@Param("id") Long id);
+
+    Optional<ExpenseRequest> findByTitle(String title);
 }

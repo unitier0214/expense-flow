@@ -51,6 +51,15 @@ jobs:
           detail_page=$(mktemp)
           edit_page=$(mktemp)
           edited_detail_page=$(mktemp)
+          approver_login_page=$(mktemp)
+          approvals_page=$(mktemp)
+          approver_detail_page=$(mktemp)
+          returned_detail_page=$(mktemp)
+          employee_login_page=$(mktemp)
+          returned_employee_detail_page=$(mktemp)
+          resubmitted_detail_page=$(mktemp)
+          second_approver_login_page=$(mktemp)
+          approved_detail_page=$(mktemp)
           login_headers=$(mktemp)
           create_headers=$(mktemp)
           edit_headers=$(mktemp)
@@ -101,6 +110,22 @@ jobs:
           location_path() {
             awk 'tolower($1) == "location:" { sub(/\r$/, "", $2); print $2; exit }' "$1" \
               | sed 's#^http://localhost:8080##'
+          }
+          login_as() {
+            local username="$1"
+            local login_page_path="$2"
+            local login_headers_path="$3"
+            curl --fail --silent --cookie-jar "$cookies" --output "$login_page_path" http://localhost:8080/login
+            local login_csrf
+            login_csrf=$(extract_csrf "$login_page_path")
+            local login_status
+            login_status=$(curl --silent --show-error --cookie "$cookies" --cookie-jar "$cookies" \
+              --dump-header "$login_headers_path" --output /dev/null --write-out '%{http_code}' \
+              --data-urlencode "username=$username" --data-urlencode "password=demo-password" \
+              --data-urlencode "_csrf=$login_csrf" http://localhost:8080/login)
+            echo "login $username HTTP status: $login_status"
+            test "$login_status" = "302"
+            grep -qiE '^location: (http://localhost:8080)?/expenses' "$login_headers_path"
           }
           curl --fail --silent --cookie-jar "$cookies" --output "$login_page" http://localhost:8080/login
           grep -q '経費申請・承認システム' "$login_page"
@@ -183,6 +208,103 @@ jobs:
           echo "logout HTTP status: $logout_status"
           test "$logout_status" = "302"
           grep -qiE '^location: (http://localhost:8080)?/login[?]logout' "$logout_headers"
+
+          login_as "demo.approver.sales.1" "$approver_login_page" "$login_headers"
+          curl --fail --silent --cookie "$cookies" --output "$approvals_page" http://localhost:8080/approvals
+          grep -q 'Compose smoke申請（編集済み）' "$approvals_page"
+          grep -q '申請中' "$approvals_page"
+          curl --fail --silent --cookie "$cookies" --output "$approver_detail_page" "http://localhost:8080$expense_path"
+          grep -q 'Compose smoke申請（編集済み）' "$approver_detail_page"
+          approval_csrf=$(extract_csrf "$approver_detail_page")
+          approval_version=$(extract_input "$approver_detail_page" version)
+          test -n "$approval_csrf"
+          test -n "$approval_version"
+          return_status=$(curl --silent --show-error --cookie "$cookies" --cookie-jar "$cookies" \
+            --dump-header "$logout_headers" --output /dev/null --write-out '%{http_code}' \
+            --data-urlencode "version=$approval_version" \
+            --data-urlencode "comment=CIで確認した差戻し理由" \
+            --data-urlencode "_csrf=$approval_csrf" \
+            "http://localhost:8080$expense_path/return")
+          echo "return HTTP status: $return_status"
+          test "$return_status" = "303"
+          curl --fail --silent --cookie "$cookies" --output "$returned_detail_page" "http://localhost:8080$expense_path"
+          grep -q '差戻し' "$returned_detail_page"
+          grep -q 'CIで確認した差戻し理由' "$returned_detail_page"
+          approver_logout_csrf=$(extract_csrf "$returned_detail_page")
+          approver_logout_status=$(curl --silent --show-error --cookie "$cookies" --cookie-jar "$cookies" \
+            --dump-header "$logout_headers" --output /dev/null --write-out '%{http_code}' \
+            --data-urlencode "_csrf=$approver_logout_csrf" http://localhost:8080/logout)
+          echo "approver logout HTTP status: $approver_logout_status"
+          test "$approver_logout_status" = "302"
+
+          login_as "demo.employee" "$employee_login_page" "$login_headers"
+          curl --fail --silent --cookie "$cookies" --output "$returned_employee_detail_page" "http://localhost:8080$expense_path"
+          grep -q 'Compose smoke申請（編集済み）' "$returned_employee_detail_page"
+          grep -q '差戻し' "$returned_employee_detail_page"
+          grep -q 'CIで確認した差戻し理由' "$returned_employee_detail_page"
+          returned_edit_csrf=$(extract_csrf "$returned_employee_detail_page")
+          returned_edit_version=$(extract_input "$returned_employee_detail_page" version)
+          curl --fail --silent --cookie "$cookies" --output "$edit_page" "http://localhost:8080$expense_path/edit"
+          returned_edit_csrf=$(extract_csrf "$edit_page")
+          returned_edit_version=$(extract_input "$edit_page" version)
+          resubmit_edit_status=$(curl --silent --show-error --cookie "$cookies" --cookie-jar "$cookies" \
+            --dump-header "$edit_headers" --output /dev/null --write-out '%{http_code}' \
+            --data-urlencode "title=Compose smoke申請（修正再申請）" \
+            --data-urlencode "purpose=CIで差戻し修正した申請" \
+            --data-urlencode "category=OTHER" \
+            --data-urlencode "expenseDate=2026-09-08" \
+            --data-urlencode "amount=1400" \
+            --data-urlencode "version=$returned_edit_version" \
+            --data-urlencode "_csrf=$returned_edit_csrf" \
+            "http://localhost:8080$expense_path/edit")
+          echo "returned edit HTTP status: $resubmit_edit_status"
+          test "$resubmit_edit_status" = "303"
+          curl --fail --silent --cookie "$cookies" --output "$resubmitted_detail_page" "http://localhost:8080$expense_path"
+          grep -q 'Compose smoke申請（修正再申請）' "$resubmitted_detail_page"
+          resubmit_csrf=$(extract_csrf "$resubmitted_detail_page")
+          resubmit_version=$(extract_input "$resubmitted_detail_page" version)
+          resubmit_status=$(curl --silent --show-error --cookie "$cookies" --cookie-jar "$cookies" \
+            --dump-header "$submit_headers" --output /dev/null --write-out '%{http_code}' \
+            --data-urlencode "version=$resubmit_version" \
+            --data-urlencode "_csrf=$resubmit_csrf" \
+            "http://localhost:8080$expense_path/submit")
+          echo "resubmit HTTP status: $resubmit_status"
+          test "$resubmit_status" = "303"
+          curl --fail --silent --cookie "$cookies" --output "$resubmitted_detail_page" "http://localhost:8080$expense_path"
+          grep -q 'Compose smoke申請（修正再申請）' "$resubmitted_detail_page"
+          grep -q '申請中' "$resubmitted_detail_page"
+          employee_logout_csrf=$(extract_csrf "$resubmitted_detail_page")
+          employee_logout_status=$(curl --silent --show-error --cookie "$cookies" --cookie-jar "$cookies" \
+            --dump-header "$logout_headers" --output /dev/null --write-out '%{http_code}' \
+            --data-urlencode "_csrf=$employee_logout_csrf" http://localhost:8080/logout)
+          echo "employee logout HTTP status: $employee_logout_status"
+          test "$employee_logout_status" = "302"
+
+          login_as "demo.approver.sales.2" "$second_approver_login_page" "$login_headers"
+          curl --fail --silent --cookie "$cookies" --output "$approvals_page" http://localhost:8080/approvals
+          grep -q 'Compose smoke申請（修正再申請）' "$approvals_page"
+          curl --fail --silent --cookie "$cookies" --output "$approver_detail_page" "http://localhost:8080$expense_path"
+          approval_csrf=$(extract_csrf "$approver_detail_page")
+          approval_version=$(extract_input "$approver_detail_page" version)
+          approve_status=$(curl --silent --show-error --cookie "$cookies" --cookie-jar "$cookies" \
+            --dump-header "$logout_headers" --output /dev/null --write-out '%{http_code}' \
+            --data-urlencode "version=$approval_version" \
+            --data-urlencode "comment=CIで確認済み" \
+            --data-urlencode "_csrf=$approval_csrf" \
+            "http://localhost:8080$expense_path/approve")
+          echo "approve HTTP status: $approve_status"
+          test "$approve_status" = "303"
+          curl --fail --silent --cookie "$cookies" --output "$approved_detail_page" "http://localhost:8080$expense_path"
+          grep -q 'Compose smoke申請（修正再申請）' "$approved_detail_page"
+          grep -q '承認済み' "$approved_detail_page"
+          grep -q 'CIで確認済み' "$approved_detail_page"
+          grep -q '承認' "$approved_detail_page"
+          final_logout_csrf=$(extract_csrf "$approved_detail_page")
+          final_logout_status=$(curl --silent --show-error --cookie "$cookies" --cookie-jar "$cookies" \
+            --dump-header "$logout_headers" --output /dev/null --write-out '%{http_code}' \
+            --data-urlencode "_csrf=$final_logout_csrf" http://localhost:8080/logout)
+          echo "final logout HTTP status: $final_logout_status"
+          test "$final_logout_status" = "302"
 
           protected_status=$(curl --silent --show-error --cookie "$cookies" --output /dev/null --write-out '%{http_code}' http://localhost:8080/expenses)
           echo "protected page after logout HTTP status: $protected_status"
