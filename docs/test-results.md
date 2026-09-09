@@ -1,26 +1,51 @@
 # Test Results
 
-## 2026-09-09（フェーズ1完了確認）
+## 2026-09-09（フェーズ2完了確認）
 
-実行環境はGitHub Actions [run 34348513761](https://github.com/unitier0214/expense-flow/actions/runs/34348513761) とし、Java 21、Spring Boot 4.1.1、Testcontainers PostgreSQL 17.11、Docker Composeを使用した。
+### 実行環境
 
-- `./mvnw --batch-mode test`：成功。12テスト、失敗0、エラー0、スキップ0。
-- `./mvnw --batch-mode verify`：成功。テストを含むverifyとパッケージングが完了。
-- `docker compose config --quiet`：成功。
-- Flyway：PostgreSQL 17上でV1マイグレーションが適用され、`flyway_schema_history`と`expense_requests`を確認。
-- Spring Security：日本語ログイン画面、未認証時の`/login`リダイレクト、認証後の`/expenses`、CSRFなしPOST拒否、CSRF付きPOSTログアウトを確認。
-- デモデータ：通常プロファイルでは初期化Beanがなく、demoプロファイルでは部署2件・ユーザー5件が投入され、初期化処理を再実行しても件数が増えないことを確認。
-- Compose smoke test：DB readiness、アプリhealthcheck、demoログイン、認証後画面、ログアウトを確認。
-- DB永続化：Composeをdown（ボリューム削除なし）してupし直した後も、DB上の変更値が保持されることを確認。
-- テストの無効化・スキップ、H2やモックDBへの置換は行っていない。
+GitHub Actions [run 34358530765](https://github.com/unitier0214/expense-flow/actions/runs/34358530765) のUbuntu runnerで、Java 21.0.12.1、Spring Boot 4.1.1、PostgreSQL 17.11、Docker Composeを使用した。検証対象コミットは [`ebe33218eef7000932f450de8103db9e0a746ef2`](https://github.com/unitier0214/expense-flow/commit/ebe33218eef7000932f450de8103db9e0a746ef2)。
 
-## ローカルで未実行の項目
+### 最終結果
 
-- ローカルの`./mvnw test`／`./mvnw verify`：Java 17.0.20しかなく、さらにMavenが`repo.maven.apache.org`を名前解決できなかったため、ローカルでは完了していない。Java 21を前提とする設定は変更せず、CIで同コマンドを成功させた。
-- ローカルのTestcontainers／Compose：Docker CLIが未導入のため未実行。
-- 実ブラウザによる目視確認：ローカルでアプリを起動できなかったため未実行。CIではcurlによるHTTP smoke testでログイン・画面表示・ログアウトを確認した。
+| 検証 | 結果 |
+|---|---|
+| `./mvnw --batch-mode test` | 成功。31テスト、失敗0、エラー0、スキップ0（ExpenseIntegrationTest 18、SecurityIntegrationTest 12、DemoDataInitializerIntegrationTest 1） |
+| `./mvnw --batch-mode verify` | 成功。テストを含むverifyとパッケージングが完了 |
+| `docker compose config --quiet` | 成功 |
+| PostgreSQL 17.11 + Flyway | 成功。新規DBにV1を適用し、JPAのスキーマ検証を通過 |
+| Spring Security | 成功。日本語ログイン、正常・不正ログイン、未認証リダイレクト、POSTログアウト、CSRF拒否、ログアウト後の保護URL再認証 |
+| demoプロファイル | 成功。営業部・開発部と5ユーザーを冪等投入。通常プロファイルでは初期化Beanなし |
+| Compose smoke | 成功。DB readiness、アプリhealthcheck、ログイン、一覧、新規作成、編集、申請、詳細・履歴、ログアウトを確認 |
+| DB永続化 | 成功。Composeをdown/up（ボリューム削除なし）してもDBの更新値を保持 |
+
+### フェーズ2の検証内容
+
+- 作成者・部署・状態・日時をサーバー側で決定し、余計な`applicant_id`、`department_id`、`status` POSTでは変更されないことを確認。
+- DRAFTの作成・編集・削除・申請、RETURNED fixtureの編集・再申請・削除拒否、SUBMITTED/APPROVEDの編集拒否を確認。
+- 本人一覧だけが検索対象となり、同部署APPROVERはDRAFT以外の他人の詳細・履歴だけ表示でき、他部署・他社員は404になることをHTTPで確認。
+- 件名・用途・分類・利用日、金額1〜1,000,000、整数の境界、元の小数・指数・カンマ・非数値入力の400と元入力保持を確認。
+- JSTの当日境界、利用日期間の両端、状態・分類・件名検索、`%`・`_`のリテラル扱い、条件保持、0件、21件以上の20件ページングを確認。
+- `@Version`の古いversion、欠落・型不正、別トランザクションの同時更新を確認し、競合時に上書きせず履歴も増えないことを確認。
+- 履歴INSERTをテスト用PostgreSQLトリガーで失敗させ、経費変更と履歴が同時にロールバックすることを確認。
+- ThymeleafのHTMLエスケープと、変更POSTの303、Securityのログイン・ログアウト302を確認。
+
+### CIの修正履歴
+
+- [run 34357536206](https://github.com/unitier0214/expense-flow/actions/runs/34357536206)：失敗。初回実装のThymeleafタイトル式、JDBC fixtureのInstant、任意検索条件のSQL型推論を検出。
+- [run 34357994227](https://github.com/unitier0214/expense-flow/actions/runs/34357994227)：失敗。任意検索条件のnullパラメータ型推論が残っていたため、検索クエリを修正。
+- [run 34358530765](https://github.com/unitier0214/expense-flow/actions/runs/34358530765)：成功。上記修正後の最終検証。
+
+### ローカルで未実行の項目
+
+- ローカルの`./mvnw test`／`./mvnw verify`：標準Javaは17.0.20で、Java 21を明示したcompile試行も`repo.maven.apache.org`の名前解決失敗により依存取得前に終了したため未完了。
+- ローカルのTestcontainers／Compose／アプリ起動：Docker CLIがないため未実行。
+- 実ブラウザでの目視・スクリーンショット：ローカル起動環境がないため未実施。CIではcurlで実際のHTML、CSRF、フォーム、リダイレクトをHTTP確認した。
+
+上記は仕様を緩めた結果ではなく、実行環境の制約である。テストの無効化・スキップ、H2やモックDBへの置換は行っていない。
 
 ## GitHub
 
 - リポジトリ：https://github.com/unitier0214/expense-flow
-- CI実行：[34348513761](https://github.com/unitier0214/expense-flow/actions/runs/34348513761)
+- フェーズ2検証コミット：https://github.com/unitier0214/expense-flow/commit/ebe33218eef7000932f450de8103db9e0a746ef2
+- フェーズ2検証CI：https://github.com/unitier0214/expense-flow/actions/runs/34358530765

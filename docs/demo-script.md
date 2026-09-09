@@ -1,9 +1,14 @@
-# Demo Script（フェーズ1）
+# Demo Script（フェーズ2）
 
-1. `SPRING_PROFILES_ACTIVE=demo docker compose up --build` でDB readiness後にアプリを起動する。
-2. `/login` を開き、`demo.employee` / `demo-password` でログインする。
-3. ログイン後の基盤案内画面と、ログアウトがPOSTで行われることを確認する。
-4. 開発者ツールなどからログインPOSTのCSRFトークンを外して送信し、403になることをテストで示す。
+この手順はdemoプロファイル専用の架空fixtureを使う。記載の認証情報は公開用の検証値であり、本番環境では使用しない。
 
-申請作成から承認までの3分デモは、申請・承認画面を実装するフェーズ2以降で完成させます。未実装機能を実装済みとして説明しません。
+1. `.env.example`を`.env`へコピーして`POSTGRES_PASSWORD`を設定し、`SPRING_PROFILES_ACTIVE=demo docker compose up --build`を実行する。
+2. `/login`を開き、社員 `demo.employee` / `demo-password` でログインする。
+3. `/expenses`で本人の申請一覧が表示されること、ヘッダーにユーザー名とPOSTログアウトがあることを確認する。
+4. 「新規申請」から件名、用途、分類、利用日（今日以前）、金額（半角数字の整数）を入力して保存する。入力を空欄・小数などにして400の項目別エラーと元入力保持も確認できる。
+5. 詳細画面でCREATE履歴を確認し、「編集」から件名や金額を変更する。保存後に303で詳細へ戻り、UPDATE履歴とversion増加を確認する。
+6. 詳細画面の「申請する」を押し、SUBMITTED（申請中）への遷移、直近申請日時、SUBMIT履歴を確認する。
+7. ログアウト後に`/expenses`へ戻ると`/login`へリダイレクトされることを確認する。必要なら同部署承認者 `demo.approver.sales.1` / `demo-password` でログインし、SUBMITTED申請の詳細・履歴だけを閲覧できることを確認する。
+8. データ永続化の確認では、Composeを停止・再起動（ボリューム削除なし）し、作成したユーザー／申請が残ることを確認する。
 
+承認・差戻しの実操作、承認待ち一覧、CSV出力はフェーズ3以降の対象であり、このデモでは操作しない。CIでは同じ流れをcurlで自動確認している。
