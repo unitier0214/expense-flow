@@ -16,3 +16,42 @@ jobs:
           cache: maven
       - run: chmod +x mvnw
       - run: ./mvnw --batch-mode verify
+      - name: Validate Docker Compose configuration
+        env:
+          POSTGRES_PASSWORD: ci-password
+        run: docker compose config --quiet
+      - name: Run demo Compose smoke test
+        env:
+          POSTGRES_PASSWORD: ci-password
+          SPRING_PROFILES_ACTIVE: demo
+        run: |
+          set -euo pipefail
+          trap 'docker compose logs --no-color; docker compose down' EXIT
+          docker compose up -d --build
+
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://localhost:8080/actuator/health | grep -q '"status":"UP"'; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              echo "Timed out waiting for the application healthcheck." >&2
+              exit 1
+            fi
+            sleep 2
+          done
+
+          cookies=$(mktemp)
+          login_headers=$(mktemp)
+          logout_headers=$(mktemp)
+          csrf=$(curl --fail --silent --cookie-jar "$cookies" http://localhost:8080/login | sed -n 's/.*name="_csrf" value="\([^"]*\)".*/\1/p')
+          test -n "$csrf"
+          curl --fail --silent --cookie "$cookies" http://localhost:8080/login | grep -q '経費申請・承認システム'
+
+          login_status=$(curl --silent --show-error --cookie "$cookies" --cookie-jar "$cookies" --dump-header "$login_headers" --output /dev/null --write-out '%{http_code}' --data-urlencode "username=demo.employee" --data-urlencode "password=demo-password" --data-urlencode "_csrf=$csrf" http://localhost:8080/login)
+          test "$login_status" = "302"
+          grep -qiE '^location: (http://localhost:8080)?/expenses' "$login_headers"
+          curl --fail --silent --cookie "$cookies" http://localhost:8080/expenses | grep -q 'フェーズ1：ログイン基盤'
+
+          logout_status=$(curl --silent --show-error --cookie "$cookies" --cookie-jar "$cookies" --dump-header "$logout_headers" --output /dev/null --write-out '%{http_code}' --data-urlencode "_csrf=$csrf" http://localhost:8080/logout)
+          test "$logout_status" = "302"
+          grep -qi '^location: /login[?]logout' "$logout_headers"
