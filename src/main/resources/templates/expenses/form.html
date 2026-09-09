@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="|${pageTitle} | ExpenseFlow|">経費申請 | ExpenseFlow</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<div th:replace="~{fragments/header :: header}"></div>
+<main class="page-shell narrow-shell" aria-labelledby="page-title">
+    <p class="eyebrow">ExpenseFlow</p>
+    <h1 id="page-title" th:text="${pageTitle}">経費申請を作成</h1>
+    <div th:if="${hasFormError}" class="alert alert-error" role="alert">
+        入力内容を確認してください。
+    </div>
+
+    <form method="post" th:action="${formAction}" class="panel expense-form">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        <input th:if="${isEdit}" type="hidden" name="version" th:value="${form.version}">
+        <div class="form-field">
+            <label for="title">件名</label>
+            <input id="title" name="title" type="text" maxlength="100" required
+                   th:value="${form.title}" aria-describedby="title-error">
+            <p id="title-error" th:if="${fieldErrors.containsKey('title')}" class="field-error"
+               th:text="${fieldErrors['title']}" role="alert">件名エラー</p>
+        </div>
+        <div class="form-field">
+            <label for="purpose">用途</label>
+            <textarea id="purpose" name="purpose" maxlength="500" required
+                      aria-describedby="purpose-error" th:text="${form.purpose}"></textarea>
+            <p id="purpose-error" th:if="${fieldErrors.containsKey('purpose')}" class="field-error"
+               th:text="${fieldErrors['purpose']}" role="alert">用途エラー</p>
+        </div>
+        <div class="form-grid-two">
+            <div class="form-field">
+                <label for="category">分類</label>
+                <select id="category" name="category" required aria-describedby="category-error">
+                    <option value="">選択してください</option>
+                    <option th:each="entry : ${categories}"
+                            th:value="${entry.key.name()}"
+                            th:text="${entry.value}"
+                            th:selected="${form.category == entry.key.name()}"></option>
+                </select>
+                <p id="category-error" th:if="${fieldErrors.containsKey('category')}" class="field-error"
+                   th:text="${fieldErrors['category']}" role="alert">分類エラー</p>
+            </div>
+            <div class="form-field">
+                <label for="expenseDate">利用日</label>
+                <input id="expenseDate" name="expenseDate" type="date" required
+                       th:value="${form.expenseDate}" aria-describedby="expenseDate-error">
+                <p id="expenseDate-error" th:if="${fieldErrors.containsKey('expenseDate')}" class="field-error"
+                   th:text="${fieldErrors['expenseDate']}" role="alert">利用日エラー</p>
+            </div>
+        </div>
+        <div class="form-field">
+            <label for="amount">金額（円）</label>
+            <input id="amount" name="amount" type="text" inputmode="numeric" maxlength="7" required
+                   th:value="${form.amount}" aria-describedby="amount-help amount-error">
+            <p id="amount-help" class="form-note">半角数字の整数で、1〜1,000,000円で入力してください。</p>
+            <p id="amount-error" th:if="${fieldErrors.containsKey('amount')}" class="field-error"
+               th:text="${fieldErrors['amount']}" role="alert">金額エラー</p>
+        </div>
+        <div class="form-actions">
+            <a class="button button-secondary" th:href="${isEdit ? '/expenses/' + form.id : '/expenses'}">キャンセル</a>
+            <button class="button button-primary" type="submit" th:text="${submitLabel}">下書きを保存</button>
+        </div>
+    </form>
+</main>
+</body>
+</html>

@@ -46,8 +46,15 @@ jobs:
 
           cookies=$(mktemp)
           login_page=$(mktemp)
+          new_page=$(mktemp)
           expenses_page=$(mktemp)
+          detail_page=$(mktemp)
+          edit_page=$(mktemp)
+          edited_detail_page=$(mktemp)
           login_headers=$(mktemp)
+          create_headers=$(mktemp)
+          edit_headers=$(mktemp)
+          submit_headers=$(mktemp)
           logout_headers=$(mktemp)
           extract_csrf() {
             python3 - "$1" <<'PY'
@@ -70,6 +77,31 @@ jobs:
           print(parser.token)
           PY
           }
+          extract_input() {
+            python3 - "$1" "$2" <<'PY'
+          import sys
+          from html.parser import HTMLParser
+
+          class InputParser(HTMLParser):
+              value = None
+
+              def handle_starttag(self, tag, attrs):
+                  attributes = dict(attrs)
+                  if tag == "input" and attributes.get("name") == sys.argv[2]:
+                      self.value = attributes.get("value")
+
+          parser = InputParser()
+          with open(sys.argv[1], encoding="utf-8") as page:
+              parser.feed(page.read())
+          if parser.value is None:
+              raise SystemExit(f"input not found: {sys.argv[2]}")
+          print(parser.value)
+          PY
+          }
+          location_path() {
+            awk 'tolower($1) == "location:" { sub(/\r$/, "", $2); print $2; exit }' "$1" \
+              | sed 's#^http://localhost:8080##'
+          }
           curl --fail --silent --cookie-jar "$cookies" --output "$login_page" http://localhost:8080/login
           grep -q '経費申請・承認システム' "$login_page"
           grep -q 'JSESSIONID' "$cookies"
@@ -83,14 +115,78 @@ jobs:
           expenses_status=$(curl --silent --show-error --cookie "$cookies" --output "$expenses_page" --write-out '%{http_code}' http://localhost:8080/expenses)
           echo "expenses HTTP status: $expenses_status"
           test "$expenses_status" = "200"
-          grep -q 'フェーズ1：ログイン基盤' "$expenses_page"
-          logout_csrf=$(extract_csrf "$expenses_page")
+          grep -q '経費申請' "$expenses_page"
+          grep -q '新規申請' "$expenses_page"
+
+          curl --fail --silent --cookie "$cookies" --output "$new_page" http://localhost:8080/expenses/new
+          create_csrf=$(extract_csrf "$new_page")
+          test -n "$create_csrf"
+          create_status=$(curl --silent --show-error --cookie "$cookies" --cookie-jar "$cookies" --dump-header "$create_headers" --output /dev/null --write-out '%{http_code}' \
+            --data-urlencode "title=Compose smoke申請" \
+            --data-urlencode "purpose=CIで作成した申請" \
+            --data-urlencode "category=OTHER" \
+            --data-urlencode "expenseDate=2026-09-08" \
+            --data-urlencode "amount=1200" \
+            --data-urlencode "_csrf=$create_csrf" \
+            http://localhost:8080/expenses)
+          echo "create HTTP status: $create_status"
+          test "$create_status" = "303"
+          expense_path=$(location_path "$create_headers")
+          test -n "$expense_path"
+
+          curl --fail --silent --cookie "$cookies" --output "$detail_page" "http://localhost:8080$expense_path"
+          grep -q 'Compose smoke申請' "$detail_page"
+          detail_csrf=$(extract_csrf "$detail_page")
+          detail_version=$(extract_input "$detail_page" version)
+          test -n "$detail_csrf"
+          test -n "$detail_version"
+
+          curl --fail --silent --cookie "$cookies" --output "$edit_page" "http://localhost:8080$expense_path/edit"
+          edit_csrf=$(extract_csrf "$edit_page")
+          edit_version=$(extract_input "$edit_page" version)
+          test -n "$edit_csrf"
+          test -n "$edit_version"
+          edit_status=$(curl --silent --show-error --cookie "$cookies" --cookie-jar "$cookies" --dump-header "$edit_headers" --output /dev/null --write-out '%{http_code}' \
+            --data-urlencode "title=Compose smoke申請（編集済み）" \
+            --data-urlencode "purpose=CIで編集した申請" \
+            --data-urlencode "category=OTHER" \
+            --data-urlencode "expenseDate=2026-09-08" \
+            --data-urlencode "amount=1300" \
+            --data-urlencode "version=$edit_version" \
+            --data-urlencode "_csrf=$edit_csrf" \
+            "http://localhost:8080$expense_path/edit")
+          echo "edit HTTP status: $edit_status"
+          test "$edit_status" = "303"
+
+          curl --fail --silent --cookie "$cookies" --output "$edited_detail_page" "http://localhost:8080$expense_path"
+          grep -q 'Compose smoke申請（編集済み）' "$edited_detail_page"
+          submit_csrf=$(extract_csrf "$edited_detail_page")
+          submit_version=$(extract_input "$edited_detail_page" version)
+          test -n "$submit_csrf"
+          test -n "$submit_version"
+          submit_status=$(curl --silent --show-error --cookie "$cookies" --cookie-jar "$cookies" --dump-header "$submit_headers" --output /dev/null --write-out '%{http_code}' \
+            --data-urlencode "version=$submit_version" \
+            --data-urlencode "_csrf=$submit_csrf" \
+            "http://localhost:8080$expense_path/submit")
+          echo "submit HTTP status: $submit_status"
+          test "$submit_status" = "303"
+
+          curl --fail --silent --cookie "$cookies" --output "$detail_page" "http://localhost:8080$expense_path"
+          grep -q 'Compose smoke申請（編集済み）' "$detail_page"
+          grep -q '申請' "$detail_page"
+          grep -q '作成' "$detail_page"
+          grep -q '更新' "$detail_page"
+          logout_csrf=$(extract_csrf "$detail_page")
           test -n "$logout_csrf"
 
           logout_status=$(curl --silent --show-error --cookie "$cookies" --cookie-jar "$cookies" --dump-header "$logout_headers" --output /dev/null --write-out '%{http_code}' --data-urlencode "_csrf=$logout_csrf" http://localhost:8080/logout)
           echo "logout HTTP status: $logout_status"
           test "$logout_status" = "302"
           grep -qiE '^location: (http://localhost:8080)?/login[?]logout' "$logout_headers"
+
+          protected_status=$(curl --silent --show-error --cookie "$cookies" --output /dev/null --write-out '%{http_code}' http://localhost:8080/expenses)
+          echo "protected page after logout HTTP status: $protected_status"
+          test "$protected_status" = "302"
 
           docker compose exec -T db psql -U expenseflow -d expenseflow -v ON_ERROR_STOP=1 -c "UPDATE users SET display_name = '永続化確認' WHERE username = 'demo.employee';"
           docker compose down

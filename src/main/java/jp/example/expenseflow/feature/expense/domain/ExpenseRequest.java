@@ -12,8 +12,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.math.BigDecimal;
@@ -72,15 +70,162 @@ public class ExpenseRequest {
     protected ExpenseRequest() {
     }
 
-    @PrePersist
-    void onCreate() {
-        Instant now = Instant.now();
-        createdAt = now;
-        updatedAt = now;
+    public static ExpenseRequest create(AppUser applicant, Department department, String title,
+                                        String purpose, ExpenseCategory category,
+                                        LocalDate expenseDate, BigDecimal amount,
+                                        Instant now, LocalDate today) {
+        String normalizedTitle = normalize(title);
+        String normalizedPurpose = normalize(purpose);
+        validateDetails(normalizedTitle, normalizedPurpose, category, expenseDate, amount, today);
+        if (applicant == null || department == null || now == null) {
+            throw new IllegalArgumentException("申請者、部署、日時は必須です");
+        }
+
+        ExpenseRequest request = new ExpenseRequest();
+        request.applicant = applicant;
+        request.department = department;
+        request.title = normalizedTitle;
+        request.purpose = normalizedPurpose;
+        request.category = category;
+        request.expenseDate = expenseDate;
+        request.amount = amount;
+        request.status = ExpenseStatus.DRAFT;
+        request.version = 0L;
+        request.createdAt = now;
+        request.updatedAt = now;
+        return request;
     }
 
-    @PreUpdate
-    void onUpdate() {
-        updatedAt = Instant.now();
+    public void updateDetails(String title, String purpose, ExpenseCategory category,
+                              LocalDate expenseDate, BigDecimal amount, Instant now,
+                              LocalDate today) {
+        ensureStatus(ExpenseStatus.DRAFT, ExpenseStatus.RETURNED);
+        String normalizedTitle = normalize(title);
+        String normalizedPurpose = normalize(purpose);
+        validateDetails(normalizedTitle, normalizedPurpose, category, expenseDate, amount, today);
+        if (now == null) {
+            throw new IllegalArgumentException("更新日時は必須です");
+        }
+        this.title = normalizedTitle;
+        this.purpose = normalizedPurpose;
+        this.category = category;
+        this.expenseDate = expenseDate;
+        this.amount = amount;
+        this.updatedAt = now;
+    }
+
+    public ExpenseStatus submit(Instant now) {
+        ensureStatus(ExpenseStatus.DRAFT, ExpenseStatus.RETURNED);
+        if (now == null) {
+            throw new IllegalArgumentException("申請日時は必須です");
+        }
+        ExpenseStatus previous = status;
+        status = ExpenseStatus.SUBMITTED;
+        submittedAt = now;
+        updatedAt = now;
+        return previous;
+    }
+
+    public boolean isEditable() {
+        return status == ExpenseStatus.DRAFT || status == ExpenseStatus.RETURNED;
+    }
+
+    public boolean isDeletable() {
+        return status == ExpenseStatus.DRAFT;
+    }
+
+    public boolean isSubmittable() {
+        return isEditable();
+    }
+
+    private void ensureStatus(ExpenseStatus... allowed) {
+        for (ExpenseStatus candidate : allowed) {
+            if (status == candidate) {
+                return;
+            }
+        }
+        throw new IllegalStateException("現在の状態では操作できません");
+    }
+
+    private static void validateDetails(String title, String purpose, ExpenseCategory category,
+                                        LocalDate expenseDate, BigDecimal amount, LocalDate today) {
+        if (title == null || title.isBlank() || title.length() > 100) {
+            throw new IllegalArgumentException("件名は1〜100文字で入力してください");
+        }
+        if (purpose == null || purpose.isBlank() || purpose.length() > 500) {
+            throw new IllegalArgumentException("用途は1〜500文字で入力してください");
+        }
+        if (category == null) {
+            throw new IllegalArgumentException("分類を選択してください");
+        }
+        if (expenseDate == null || today == null || expenseDate.isAfter(today)) {
+            throw new IllegalArgumentException("利用日は今日以前の日付を入力してください");
+        }
+        validateAmount(amount);
+    }
+
+    public static void validateAmount(BigDecimal amount) {
+        if (amount == null
+                || amount.compareTo(BigDecimal.ONE) < 0
+                || amount.compareTo(new BigDecimal("1000000")) > 0
+                || amount.remainder(BigDecimal.ONE).compareTo(BigDecimal.ZERO) != 0) {
+            throw new IllegalArgumentException("金額は1〜1,000,000円の整数で入力してください");
+        }
+    }
+
+    private static String normalize(String value) {
+        return value == null ? null : value.trim();
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public AppUser getApplicant() {
+        return applicant;
+    }
+
+    public Department getDepartment() {
+        return department;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public String getPurpose() {
+        return purpose;
+    }
+
+    public ExpenseCategory getCategory() {
+        return category;
+    }
+
+    public LocalDate getExpenseDate() {
+        return expenseDate;
+    }
+
+    public BigDecimal getAmount() {
+        return amount;
+    }
+
+    public ExpenseStatus getStatus() {
+        return status;
+    }
+
+    public long getVersion() {
+        return version;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public Instant getSubmittedAt() {
+        return submittedAt;
     }
 }

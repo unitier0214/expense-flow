@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="|${status} ${heading} | ExpenseFlow|">エラー | ExpenseFlow</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<div th:if="${currentUsername != null}" th:replace="~{fragments/header :: header}"></div>
+<main class="page-shell narrow-shell" aria-labelledby="page-title">
+    <section class="panel error-panel">
+        <p class="eyebrow" th:text="${status}">500</p>
+        <h1 id="page-title" th:text="${heading}">エラーが発生しました</h1>
+        <p th:text="${message}">処理に失敗しました。</p>
+        <p th:if="${correlationId != null}" class="muted">
+            照合ID：<code th:text="${correlationId}">correlation-id</code>
+        </p>
+        <a class="button button-primary" th:if="${backUrl != null}" th:href="${backUrl}">戻る</a>
+        <a class="button button-primary" th:unless="${backUrl != null}" th:href="@{/expenses}">申請一覧へ</a>
+    </section>
+</main>
+</body>
+</html>

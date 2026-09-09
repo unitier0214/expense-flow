@@ -140,7 +140,7 @@ class SecurityIntegrationTest {
         mockMvc.perform(get("/expenses").session(session))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("test.employee")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("フェーズ1：ログイン基盤")));
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("経費申請")));
     }
 
     @Test
@@ -190,5 +190,24 @@ class SecurityIntegrationTest {
     void logoutPostWithoutCsrfIsRejected() throws Exception {
         mockMvc.perform(post("/logout"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void loggedOutUserMustAuthenticateAgainForProtectedPage() throws Exception {
+        MvcResult loginResult = mockMvc.perform(post("/login")
+                        .param("username", "test.employee")
+                        .param("password", "test-password")
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andReturn();
+
+        MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession(false);
+        mockMvc.perform(post("/logout").session(session).with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login?logout"));
+
+        mockMvc.perform(get("/expenses").session(session))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"));
     }
 }

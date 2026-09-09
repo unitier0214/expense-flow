@@ -9,11 +9,98 @@
 <body>
 <div th:replace="~{fragments/header :: header}"></div>
 <main class="page-shell" aria-labelledby="page-title">
-    <p class="eyebrow">ExpenseFlow</p>
-    <h1 id="page-title">経費申請</h1>
-    <section class="notice-panel" aria-labelledby="phase-title">
-        <h2 id="phase-title">フェーズ1：ログイン基盤</h2>
-        <p>ログインとDB基盤が利用できます。申請一覧・作成・承認フローは後続フェーズで実装します。</p>
+    <div class="page-heading">
+        <div>
+            <p class="eyebrow">ExpenseFlow</p>
+            <h1 id="page-title">経費申請</h1>
+        </div>
+        <a class="button button-primary" th:href="@{/expenses/new}">新規申請</a>
+    </div>
+
+    <section class="panel" aria-labelledby="search-title">
+        <h2 id="search-title">検索</h2>
+        <form method="get" th:action="@{/expenses}" class="filter-grid">
+            <div class="form-field compact-field">
+                <label for="status">状態</label>
+                <select id="status" name="status">
+                    <option value="">すべて</option>
+                    <option th:each="entry : ${statuses}"
+                            th:value="${entry.key.name()}"
+                            th:text="${entry.value}"
+                            th:selected="${page.status == entry.key.name()}"></option>
+                </select>
+            </div>
+            <div class="form-field compact-field">
+                <label for="category">分類</label>
+                <select id="category" name="category">
+                    <option value="">すべて</option>
+                    <option th:each="entry : ${categories}"
+                            th:value="${entry.key.name()}"
+                            th:text="${entry.value}"
+                            th:selected="${page.category == entry.key.name()}"></option>
+                </select>
+            </div>
+            <div class="form-field compact-field">
+                <label for="from">利用日（開始）</label>
+                <input id="from" name="from" type="date" th:value="${page.from}">
+            </div>
+            <div class="form-field compact-field">
+                <label for="to">利用日（終了）</label>
+                <input id="to" name="to" type="date" th:value="${page.to}">
+            </div>
+            <div class="form-field compact-field filter-query">
+                <label for="q">件名</label>
+                <input id="q" name="q" type="search" maxlength="100" th:value="${page.q}"
+                       placeholder="件名で検索">
+            </div>
+            <div class="filter-actions">
+                <button class="button button-primary" type="submit">検索する</button>
+                <a class="button button-secondary" th:href="@{/expenses}">クリア</a>
+            </div>
+        </form>
+    </section>
+
+    <section class="panel results-panel" aria-labelledby="results-title">
+        <div class="section-heading">
+            <h2 id="results-title">申請一覧</h2>
+            <p class="muted" th:text="|${page.totalElements}件|">0件</p>
+        </div>
+        <div th:if="${#lists.isEmpty(page.items)}" class="empty-state">
+            <p>条件に一致する申請はありません。</p>
+            <a th:href="@{/expenses/new}">新しい申請を作成する</a>
+        </div>
+        <div th:unless="${#lists.isEmpty(page.items)}" class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th scope="col">件名</th>
+                    <th scope="col">分類</th>
+                    <th scope="col">利用日</th>
+                    <th scope="col" class="amount-cell">金額</th>
+                    <th scope="col">状態</th>
+                    <th scope="col">最終更新</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="item : ${page.items}">
+                    <td><a th:href="@{/expenses/{id}(id=${item.id})}" th:text="${item.title}">件名</a></td>
+                    <td th:text="${item.categoryLabel}">交通費</td>
+                    <td th:text="${item.expenseDate}">2026-09-01</td>
+                    <td class="amount-cell" th:text="|${item.amount}円|">1,000円</td>
+                    <td><span class="status" th:classappend="| status-${item.status.toLowerCase()}|"
+                              th:text="${item.statusLabel}">下書き</span></td>
+                    <td th:text="${item.updatedAt}">2026/09/09 20:00</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <nav th:if="${page.totalPages > 1}" class="pagination" aria-label="ページ移動">
+            <a th:if="${page.hasPrevious}"
+               th:href="@{/expenses(page=${page.number - 1},status=${page.status},category=${page.category},from=${page.from},to=${page.to},q=${page.q})}">前へ</a>
+            <span th:text="|${page.number + 1} / ${page.totalPages}|">1 / 1</span>
+            <a th:if="${page.hasNext}"
+               th:href="@{/expenses(page=${page.number + 1},status=${page.status},category=${page.category},from=${page.from},to=${page.to},q=${page.q})}">次へ</a>
+        </nav>
     </section>
 </main>
 </body>

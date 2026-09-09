@@ -47,4 +47,69 @@ public class ExpenseEvent {
 
     @Column(name = "occurred_at", nullable = false)
     private Instant occurredAt;
+
+    protected ExpenseEvent() {
+    }
+
+    private ExpenseEvent(ExpenseRequest expense, AppUser actor, ExpenseEventAction action,
+                         ExpenseStatus fromStatus, ExpenseStatus toStatus, String comment,
+                         Instant occurredAt) {
+        this.expense = expense;
+        this.actor = actor;
+        this.action = action;
+        this.fromStatus = fromStatus;
+        this.toStatus = toStatus;
+        this.comment = comment;
+        this.occurredAt = occurredAt;
+    }
+
+    public static ExpenseEvent record(ExpenseRequest expense, AppUser actor,
+                                      ExpenseEventAction action, ExpenseStatus fromStatus,
+                                      ExpenseStatus toStatus, String comment, Instant occurredAt) {
+        if (expense == null || actor == null || action == null || toStatus == null || occurredAt == null) {
+            throw new IllegalArgumentException("履歴に必要な値が不足しています");
+        }
+        return new ExpenseEvent(expense, actor, action, fromStatus, toStatus,
+                normalizeComment(comment), occurredAt);
+    }
+
+    private static String normalizeComment(String comment) {
+        if (comment == null) {
+            return null;
+        }
+        String trimmed = comment.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public ExpenseRequest getExpense() {
+        return expense;
+    }
+
+    public AppUser getActor() {
+        return actor;
+    }
+
+    public ExpenseEventAction getAction() {
+        return action;
+    }
+
+    public ExpenseStatus getFromStatus() {
+        return fromStatus;
+    }
+
+    public ExpenseStatus getToStatus() {
+        return toStatus;
+    }
+
+    public String getComment() {
+        return comment;
+    }
+
+    public Instant getOccurredAt() {
+        return occurredAt;
+    }
 }
