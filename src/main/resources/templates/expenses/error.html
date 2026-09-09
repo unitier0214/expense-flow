@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title th:text="|${status} ${heading} | ExpenseFlow|">エラー | ExpenseFlow</title>
+    <title th:text="${status + ' ' + heading + ' | ExpenseFlow'}">エラー | ExpenseFlow</title>
     <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
 <body>

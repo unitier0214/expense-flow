@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.net.URI;
+import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -714,7 +715,7 @@ class ExpenseIntegrationTest {
                 ExpenseEventAction.CREATE, null, ExpenseStatus.DRAFT, null, FIXED_INSTANT));
         if (status != ExpenseStatus.DRAFT) {
             jdbcTemplate.update("update expense_requests set status = ?, submitted_at = ?, updated_at = ? where id = ?",
-                    status.name(), FIXED_INSTANT, FIXED_INSTANT, request.getId());
+                    status.name(), Timestamp.from(FIXED_INSTANT), Timestamp.from(FIXED_INSTANT), request.getId());
             ExpenseEventAction action = status == ExpenseStatus.RETURNED
                     ? ExpenseEventAction.RETURN : ExpenseEventAction.APPROVE;
             expenseEventRepository.saveAndFlush(ExpenseEvent.record(request, approver, action,

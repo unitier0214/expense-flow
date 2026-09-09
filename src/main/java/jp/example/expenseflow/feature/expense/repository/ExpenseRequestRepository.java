@@ -23,7 +23,7 @@ public interface ExpenseRequestRepository extends JpaRepository<ExpenseRequest, 
               and (:category is null or e.category = :category)
               and (:fromDate is null or e.expenseDate >= :fromDate)
               and (:toDate is null or e.expenseDate <= :toDate)
-              and (:q is null or upper(e.title) like upper(concat('%', :q, '%')) escape '\\')
+              and upper(e.title) like upper(concat('%', :q, '%')) escape '\\'
             """,
             countQuery = """
             select count(e)
@@ -33,7 +33,7 @@ public interface ExpenseRequestRepository extends JpaRepository<ExpenseRequest, 
               and (:category is null or e.category = :category)
               and (:fromDate is null or e.expenseDate >= :fromDate)
               and (:toDate is null or e.expenseDate <= :toDate)
-              and (:q is null or upper(e.title) like upper(concat('%', :q, '%')) escape '\\')
+              and upper(e.title) like upper(concat('%', :q, '%')) escape '\\'
             """)
     Page<ExpenseRequest> findOwnPage(@Param("applicantId") Long applicantId,
                                      @Param("status") ExpenseStatus status,
@@ -42,6 +42,32 @@ public interface ExpenseRequestRepository extends JpaRepository<ExpenseRequest, 
                                      @Param("toDate") LocalDate toDate,
                                      @Param("q") String q,
                                      Pageable pageable);
+
+    @EntityGraph(attributePaths = {"applicant", "department"})
+    @Query(value = """
+            select e
+            from ExpenseRequest e
+            where e.applicant.id = :applicantId
+              and (:status is null or e.status = :status)
+              and (:category is null or e.category = :category)
+              and (:fromDate is null or e.expenseDate >= :fromDate)
+              and (:toDate is null or e.expenseDate <= :toDate)
+            """,
+            countQuery = """
+            select count(e)
+            from ExpenseRequest e
+            where e.applicant.id = :applicantId
+              and (:status is null or e.status = :status)
+              and (:category is null or e.category = :category)
+              and (:fromDate is null or e.expenseDate >= :fromDate)
+              and (:toDate is null or e.expenseDate <= :toDate)
+            """)
+    Page<ExpenseRequest> findOwnPageWithoutQuery(@Param("applicantId") Long applicantId,
+                                                  @Param("status") ExpenseStatus status,
+                                                  @Param("category") ExpenseCategory category,
+                                                  @Param("fromDate") LocalDate fromDate,
+                                                  @Param("toDate") LocalDate toDate,
+                                                  Pageable pageable);
 
     @EntityGraph(attributePaths = {"applicant", "department"})
     @Query("select e from ExpenseRequest e where e.id = :id")

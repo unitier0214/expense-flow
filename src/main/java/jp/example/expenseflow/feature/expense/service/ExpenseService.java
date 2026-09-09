@@ -79,9 +79,13 @@ public class ExpenseService {
         CurrentUser currentUser = currentUserService.require(username);
         PageRequest pageRequest = PageRequest.of(criteria.pageNumber(), PAGE_SIZE,
                 Sort.by(Sort.Order.desc("updatedAt"), Sort.Order.desc("id")));
-        Page<ExpenseRequest> requests = expenseRequestRepository.findOwnPage(
-                currentUser.id(), criteria.status(), criteria.category(), criteria.fromDate(),
-                criteria.toDate(), escapeLike(criteria.query()), pageRequest);
+        Page<ExpenseRequest> requests = criteria.query() == null
+                ? expenseRequestRepository.findOwnPageWithoutQuery(
+                        currentUser.id(), criteria.status(), criteria.category(), criteria.fromDate(),
+                        criteria.toDate(), pageRequest)
+                : expenseRequestRepository.findOwnPage(
+                        currentUser.id(), criteria.status(), criteria.category(), criteria.fromDate(),
+                        criteria.toDate(), escapeLike(criteria.query()), pageRequest);
 
         List<ExpenseListItem> items = requests.getContent().stream()
                 .map(this::toListItem)
