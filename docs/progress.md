@@ -71,11 +71,19 @@
 - [run 34401685105](https://github.com/unitier0214/expense-flow/actions/runs/34401685105)：失敗。承認待ち一覧に対象の状態ラベルがなく、対象申請の状態確認が成立していなかったため、一覧表示を修正した。
 - [run 34402776016](https://github.com/unitier0214/expense-flow/actions/runs/34402776016)：成功。42テスト、失敗0・エラー0・スキップ0。Compose smokeは作成から承認、ログアウト後の保護URL拒否、DB永続化まで完了した。
 
-## フェーズ5への申し送り
+## フェーズ5：CSV出力（完了）
 
-- CSVはこのフェーズ4完了コミットの後に、独立した追加機能として実装する。
-- `GET /expenses/export.csv`を本人一覧と同じ検索・認可・並び順で実装し、ページングを外した全件抽出、1000件上限、UTF-8 BOM、RFC 4180相当の引用、数式対策を追加する。
-- T13と既存T01〜T12を回帰実行し、CSV追加後の対象SHAとCI URLを新たに記録する。
+- フェーズ4の必須機能完成コミット [`f7182a10`](https://github.com/unitier0214/expense-flow/commit/f7182a10c71e23e3839b22719aac88f1c365e91a) の後に、CSVを独立した追加機能として実装した。
+- `GET /expenses/export.csv`を本人一覧と同じ認可・検索条件・`updated_at DESC, id DESC`で実装し、ページングを外した1,001件取得で上限超過を検出する。
+- UTF-8 BOM、日本語ヘッダー・状態ラベル・JST日時、固定Content-Disposition、RFC 4180相当の引用、CSV数式対策を実装した。
+- 一覧画面へ検索条件を保持するCSVボタンを追加し、T13とT01〜T12を回帰検証した。
+- CSV実装対象コミットは [`41f90066`](https://github.com/unitier0214/expense-flow/commit/41f90066a190dc8f0f78faba1849f4b044b19722)、CIは [run 34406014385](https://github.com/unitier0214/expense-flow/actions/runs/34406014385)。49テスト、失敗0・エラー0・スキップ0。`verify`、Compose設定、拡張Compose smokeも成功した。
+
+### 完成時点の申し送り
+
+- フェーズ1〜5の実装範囲はコード・Testcontainers／MockMvcテスト・CI smoke・資料へ反映済み。承認・差戻しの実操作とCSVまでが完成範囲である。
+- 実ブラウザの目視とスクリーンショットは、作業環境にDocker／起動アプリ／ブラウザがないため未実施。CIのcurl HTTP検証とは区別して報告する。
+- 新規デプロイ、実運用認証情報の投入、設計外の追加機能は行っていない。次の作業はAstraの最終レビューと、必要なら指摘対応である。
 
 ### ローカル検証の制約
 

@@ -66,3 +66,11 @@
 - Compose smokeはcurlを用いたHTTP検証として実装する。各GETのHTMLからCSRFとversionを取得し、件名・状態ラベル・差戻し理由・承認コメント・履歴を対象申請の値として確認する。実ブラウザ操作の代替とは記録しない。
 - 小さな画面幅では表を横スクロールさせ、フォームの主要ボタンはタップしやすい最小高さを確保する。設計外のダッシュボードや機能は追加しない。
 - Phase4の必須機能完成境界は [`f7182a10`](https://github.com/unitier0214/expense-flow/commit/f7182a10c71e23e3839b22719aac88f1c365e91a) とする。CSVはこの境界の後に別コミットとして実装する。
+
+## 2026-09-09：フェーズ5のCSV出力
+
+- CSVと一覧の検索解釈をずらさないため、`ExpenseService`の検索条件解析・本人検索・`updated_at DESC, id DESC`を共有し、CSVだけページサイズを1,001件にして上限超過を検出する。1,001件を超えた場合は400で絞り込みを案内し、先頭1,000件だけを黙って返さない。
+- CSVはJavaの`StringBuilder`でUTF-8バイト列を作り、先頭にBOM、行末にCRLFを付ける。セル内の引用符は二重化し、カンマ・改行・引用符を含むセルだけRFC 4180相当で引用する。Content-Dispositionのファイル名は`expense-flow-expenses.csv`に固定する。
+- CSVの文字列セルは、先頭の空白を飛ばした最初の文字が`=`, `+`, `-`, `@`または制御文字の場合にアポストロフィを付ける。IDと検証済み整数金額は数値列としてそのまま出力し、doubleや丸めは使わない。
+- CSVの検索条件は一覧画面のstatus/category/from/to/qをリンクへ引き継ぐ。エクスポートはGETであり、一覧と同じ認可をServiceで行うため、CSRFトークンを追加する設計にはしない。通常の変更POSTとログアウトのCSRF保護は維持する。
+- CSV実装はフェーズ4の必須機能完成後の独立変更とし、Testcontainers PostgreSQLの`CsvIntegrationTest` 7件を追加してT13を確認した。テスト専用ClockのBean名重複は`@Primary`で解消し、本番Beanへ特例を持ち込まない。

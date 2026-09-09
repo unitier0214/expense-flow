@@ -113,3 +113,35 @@ GitHub Actions [run 34358530765](https://github.com/unitier0214/expense-flow/act
 ### フェーズ5への境界
 
 CSV出力はまだ実装していない。Phase4の必須機能完成を [`f7182a10`](https://github.com/unitier0214/expense-flow/commit/f7182a10c71e23e3839b22719aac88f1c365e91a) として記録し、CSVはこのコミット以後の独立変更で実装する。
+
+## フェーズ5：CSV出力（2026-09-09）
+
+### 実行環境と対象
+
+CSV実装の検証対象は [`41f90066a190dc8f0f78faba1849f4b044b19722`](https://github.com/unitier0214/expense-flow/commit/41f90066a190dc8f0f78faba1849f4b044b19722) である。GitHub Actions [run 34406014385](https://github.com/unitier0214/expense-flow/actions/runs/34406014385) のUbuntu runner、Java 21.0.12、Spring Boot 4.1.1、PostgreSQL 17.11、Docker Composeで実行した。Phase4以前の成功CIをCSV追加の成功結果へ流用していない。
+
+### 結果
+
+| 検証 | 結果 |
+|---|---|
+| `./mvnw --batch-mode test` | 成功。49テスト、失敗0・エラー0・スキップ0（Expense 19、Approval 10、CSV 7、Security 12、Demo initializer 1） |
+| `./mvnw --batch-mode verify` | 成功。49テストとパッケージングが完了 |
+| `docker compose config --quiet` | 成功 |
+| CSV認可・検索 | 成功。本人だけ、状態・分類・利用日期間・件名の条件、両端含み、`updated_at DESC, id DESC`を確認 |
+| CSV形式 | 成功。UTF-8 BOM、日本語ヘッダー・状態・JST日時、固定ファイル名、RFC 4180相当の引用、カンマ・改行・引用符、数式対策を確認 |
+| CSV件数 | 成功。0件はヘッダーのみ、1,000件は全行、1,001件は400で絞り込みを案内し、黙って切り捨てないことを確認 |
+| Compose smoke | 成功。社員の作成→編集→申請→差戻し→修正・再申請→承認→詳細・履歴→ログアウト、検索条件付きCSV、保護URL拒否、DB永続化を確認 |
+
+### CSV追加時の失敗と修正
+
+- [run 34405496732](https://github.com/unitier0214/expense-flow/actions/runs/34405496732)：失敗。`CsvIntegrationTest`の固定Clockが本番のClock Beanと重複し、`NoUniqueBeanDefinitionException`で7件のテストコンテキストが起動できなかった。
+- 修正コミット [`41f90066`](https://github.com/unitier0214/expense-flow/commit/41f90066a190dc8f0f78faba1849f4b044b19722) でテスト専用固定Clockを`@Primary`にし、本番コードのClock構成を変更せずにテストの意図を明確化した。
+- [run 34406014385](https://github.com/unitier0214/expense-flow/actions/runs/34406014385)：上記修正後の成功。test／verify／Compose設定／Compose smokeがすべて成功した。
+
+### ローカル未実行
+
+- ローカルの`./mvnw --batch-mode test`／`verify`：標準Javaは17.0.20で、Java 21を指定した実行も`repo.maven.apache.org`の名前解決失敗により依存取得前に終了した。
+- ローカルのTestcontainers／Compose／アプリ起動：Docker CLIがないため未実行。
+- 実ブラウザ操作・目視・スクリーンショット：ローカルでアプリを起動できず、ブラウザ環境もないため未実施。CIのcurlによるHTML／HTTP検証をブラウザ確認とは呼んでいない。
+
+上記の未実行は仕様を緩めた結果ではない。テストの無効化・スキップ、H2やモックDBへの置換は行っていない。
