@@ -41,17 +41,25 @@ jobs:
           done
 
           cookies=$(mktemp)
+          login_page=$(mktemp)
+          expenses_page=$(mktemp)
           login_headers=$(mktemp)
           logout_headers=$(mktemp)
-          csrf=$(curl --fail --silent --cookie-jar "$cookies" http://localhost:8080/login | sed -n 's/.*name="_csrf" value="\([^"]*\)".*/\1/p')
+          curl --fail --silent --cookie-jar "$cookies" --output "$login_page" http://localhost:8080/login
+          grep -q '経費申請・承認システム' "$login_page"
+          csrf=$(sed -n 's/.*name="_csrf" value="\([^"]*\)".*/\1/p' "$login_page")
           test -n "$csrf"
-          curl --fail --silent --cookie "$cookies" http://localhost:8080/login | grep -q '経費申請・承認システム'
 
           login_status=$(curl --silent --show-error --cookie "$cookies" --cookie-jar "$cookies" --dump-header "$login_headers" --output /dev/null --write-out '%{http_code}' --data-urlencode "username=demo.employee" --data-urlencode "password=demo-password" --data-urlencode "_csrf=$csrf" http://localhost:8080/login)
+          echo "login HTTP status: $login_status"
           test "$login_status" = "302"
           grep -qiE '^location: (http://localhost:8080)?/expenses' "$login_headers"
-          curl --fail --silent --cookie "$cookies" http://localhost:8080/expenses | grep -q 'フェーズ1：ログイン基盤'
+          curl --fail --silent --cookie "$cookies" --output "$expenses_page" http://localhost:8080/expenses
+          grep -q 'フェーズ1：ログイン基盤' "$expenses_page"
+          logout_csrf=$(sed -n 's/.*name="_csrf" value="\([^"]*\)".*/\1/p' "$expenses_page")
+          test -n "$logout_csrf"
 
-          logout_status=$(curl --silent --show-error --cookie "$cookies" --cookie-jar "$cookies" --dump-header "$logout_headers" --output /dev/null --write-out '%{http_code}' --data-urlencode "_csrf=$csrf" http://localhost:8080/logout)
+          logout_status=$(curl --silent --show-error --cookie "$cookies" --cookie-jar "$cookies" --dump-header "$logout_headers" --output /dev/null --write-out '%{http_code}' --data-urlencode "_csrf=$logout_csrf" http://localhost:8080/logout)
+          echo "logout HTTP status: $logout_status"
           test "$logout_status" = "302"
-          grep -qi '^location: /login[?]logout' "$logout_headers"
+          grep -qiE '^location: (http://localhost:8080)?/login[?]logout' "$logout_headers"
