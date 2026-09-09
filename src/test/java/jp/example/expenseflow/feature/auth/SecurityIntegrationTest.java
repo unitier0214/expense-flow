@@ -127,6 +127,23 @@ class SecurityIntegrationTest {
     }
 
     @Test
+    void authenticatedUserCanViewExpensesPage() throws Exception {
+        MvcResult loginResult = mockMvc.perform(post("/login")
+                        .param("username", "test.employee")
+                        .param("password", "test-password")
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andReturn();
+
+        MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession(false);
+
+        mockMvc.perform(get("/expenses").session(session))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("test.employee")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("フェーズ1：ログイン基盤")));
+    }
+
+    @Test
     void invalidLoginReturnsToLoginWithError() throws Exception {
         mockMvc.perform(post("/login")
                         .param("username", "test.employee")
