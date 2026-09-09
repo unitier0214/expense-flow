@@ -125,6 +125,7 @@ jobs:
               --data-urlencode "_csrf=$login_csrf" http://localhost:8080/login)
             echo "login $username HTTP status: $login_status"
             test "$login_status" = "302"
+            echo "login $username Location: $(location_path "$login_headers_path")"
             grep -qiE '^location: (http://localhost:8080)?/expenses' "$login_headers_path"
           }
           curl --fail --silent --cookie-jar "$cookies" --output "$login_page" http://localhost:8080/login
@@ -210,7 +211,9 @@ jobs:
           grep -qiE '^location: (http://localhost:8080)?/login[?]logout' "$logout_headers"
 
           login_as "demo.approver.sales.1" "$approver_login_page" "$login_headers"
-          curl --fail --silent --cookie "$cookies" --output "$approvals_page" http://localhost:8080/approvals
+          approvals_http_status=$(curl --silent --show-error --cookie "$cookies" --output "$approvals_page" --write-out '%{http_code}' http://localhost:8080/approvals)
+          echo "approvals HTTP status: $approvals_http_status"
+          test "$approvals_http_status" = "200"
           grep -q 'Compose smoke申請（編集済み）' "$approvals_page"
           grep -q '申請中' "$approvals_page"
           curl --fail --silent --cookie "$cookies" --output "$approver_detail_page" "http://localhost:8080$expense_path"
