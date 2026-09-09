@@ -456,6 +456,8 @@ public class ExpenseService {
                 CATEGORY_LABELS.get(request.getCategory()),
                 request.getExpenseDate().toString(),
                 request.getAmount().toPlainString(),
+                request.getStatus().name(),
+                STATUS_LABELS.get(request.getStatus()),
                 formatInstant(request.getSubmittedAt()),
                 request.getVersion());
     }

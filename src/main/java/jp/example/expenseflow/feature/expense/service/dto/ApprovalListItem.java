@@ -9,12 +9,15 @@ public class ApprovalListItem {
     private final String categoryLabel;
     private final String expenseDate;
     private final String amount;
+    private final String status;
+    private final String statusLabel;
     private final String submittedAt;
     private final long version;
 
     public ApprovalListItem(Long id, String applicantName, String applicantUsername,
                            String title, String categoryLabel, String expenseDate,
-                           String amount, String submittedAt, long version) {
+                           String amount, String status, String statusLabel,
+                           String submittedAt, long version) {
         this.id = id;
         this.applicantName = applicantName;
         this.applicantUsername = applicantUsername;
@@ -22,6 +25,8 @@ public class ApprovalListItem {
         this.categoryLabel = categoryLabel;
         this.expenseDate = expenseDate;
         this.amount = amount;
+        this.status = status;
+        this.statusLabel = statusLabel;
         this.submittedAt = submittedAt;
         this.version = version;
     }
@@ -52,6 +57,14 @@ public class ApprovalListItem {
 
     public String getAmount() {
         return amount;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public String getStatusLabel() {
+        return statusLabel;
     }
 
     public String getSubmittedAt() {
