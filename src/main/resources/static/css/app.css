@@ -50,6 +50,7 @@ input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible
 .alert-error { background: #fef3f2; color: var(--danger); }
 .alert-success { background: #ecfdf3; color: var(--success); }
 .page-heading, .section-heading, .form-actions { align-items: center; display: flex; gap: 1rem; justify-content: space-between; }
+.page-actions { align-items: center; display: flex; flex-wrap: wrap; gap: .5rem; }
 .page-heading { margin-bottom: 1.5rem; }
 .page-heading h1 { margin-bottom: 0; }
 .panel { background: var(--white); border: 1px solid var(--border); border-radius: .75rem; box-shadow: 0 4px 18px rgba(16, 42, 67, .06); margin-top: 1.5rem; padding: 1.5rem; }
@@ -100,6 +101,7 @@ code { background: #eaf0f6; border-radius: .25rem; padding: .1rem .3rem; }
     .site-header { align-items: flex-start; gap: .75rem; }
     .site-header nav { align-items: flex-end; flex-direction: column; gap: .35rem; }
     .page-heading { align-items: flex-start; flex-direction: column; }
+    .page-actions { width: 100%; }
     .filter-grid, .form-grid-two { grid-template-columns: 1fr; }
     .filter-query, .filter-actions { grid-column: auto; }
     .filter-actions { justify-content: flex-start; }

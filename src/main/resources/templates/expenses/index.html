@@ -14,7 +14,11 @@
             <p class="eyebrow">ExpenseFlow</p>
             <h1 id="page-title">経費申請</h1>
         </div>
-        <a class="button button-primary" th:href="@{/expenses/new}">新規申請</a>
+        <div class="page-actions">
+            <a class="button button-secondary"
+               th:href="@{/expenses/export.csv(status=${page.status},category=${page.category},from=${page.from},to=${page.to},q=${page.q})}">CSV出力</a>
+            <a class="button button-primary" th:href="@{/expenses/new}">新規申請</a>
+        </div>
     </div>
 
     <section class="panel" aria-labelledby="search-title">
@@ -65,6 +69,7 @@
             <h2 id="results-title">申請一覧</h2>
             <p class="muted" th:text="|${page.totalElements}件|">0件</p>
         </div>
+        <p class="form-note">表示中の検索条件に一致する申請を、最大1,000件までCSV出力できます。</p>
         <div th:if="${#lists.isEmpty(page.items)}" class="empty-state">
             <p>条件に一致する申請はありません。</p>
             <a th:href="@{/expenses/new}">新しい申請を作成する</a>

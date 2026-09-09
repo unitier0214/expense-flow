@@ -8,7 +8,10 @@ import jp.example.expenseflow.feature.expense.service.dto.ApprovalForm;
 import jp.example.expenseflow.feature.expense.service.dto.ExpenseDetailView;
 import jp.example.expenseflow.feature.expense.service.dto.ExpenseForm;
 import jp.example.expenseflow.feature.expense.service.dto.ExpenseListPage;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.validation.BindingResult;
@@ -51,6 +54,22 @@ public class ExpenseController {
         model.addObject("statuses", ExpenseService.statusLabels());
         model.addObject("categories", ExpenseService.categoryLabels());
         return model;
+    }
+
+    @GetMapping(value = "/expenses/export.csv", produces = "text/csv")
+    public ResponseEntity<byte[]> export(Authentication authentication,
+                                         @RequestParam(required = false) String status,
+                                         @RequestParam(required = false) String category,
+                                         @RequestParam(required = false) String from,
+                                         @RequestParam(required = false) String to,
+                                         @RequestParam(required = false) String q) {
+        byte[] csv = expenseService.exportCsv(authentication.getName(), status, category,
+                from, to, q);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("text/csv;charset=UTF-8"))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"expense-flow-expenses.csv\"")
+                .body(csv);
     }
 
     @GetMapping("/expenses/new")

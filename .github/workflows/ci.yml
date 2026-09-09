@@ -51,6 +51,7 @@ jobs:
           detail_page=$(mktemp)
           edit_page=$(mktemp)
           edited_detail_page=$(mktemp)
+          csv_page=$(mktemp)
           approver_login_page=$(mktemp)
           approvals_page=$(mktemp)
           approver_detail_page=$(mktemp)
@@ -205,6 +206,19 @@ jobs:
           grep -q '申請' "$detail_page"
           grep -q '作成' "$detail_page"
           grep -q '更新' "$detail_page"
+          csv_status=$(curl --silent --show-error --cookie "$cookies" --output "$csv_page" --write-out '%{http_code}' \
+            'http://localhost:8080/expenses/export.csv?status=SUBMITTED&q=Compose%20smoke')
+          echo "csv HTTP status: $csv_status"
+          test "$csv_status" = "200"
+          python3 - "$csv_page" <<'PY'
+          import sys
+
+          with open(sys.argv[1], "rb") as csv_file:
+              csv_text = csv_file.read().decode("utf-8-sig")
+          assert csv_text.startswith("ID,件名,分類,利用日,金額,状態,更新日時\r\n")
+          assert "Compose smoke申請（編集済み）" in csv_text
+          assert ",申請中," in csv_text
+          PY
           logout_csrf=$(extract_csrf "$detail_page")
           test -n "$logout_csrf"
 

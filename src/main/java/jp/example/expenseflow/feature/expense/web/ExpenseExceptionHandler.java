@@ -2,6 +2,7 @@ package jp.example.expenseflow.feature.expense.web;
 
 import java.util.UUID;
 import jp.example.expenseflow.feature.expense.service.ExpenseConflictException;
+import jp.example.expenseflow.feature.expense.service.ExpenseExportLimitException;
 import jp.example.expenseflow.feature.expense.service.ExpenseForbiddenException;
 import jp.example.expenseflow.feature.expense.service.ExpenseInputException;
 import jp.example.expenseflow.feature.expense.service.ExpenseNotFoundException;
@@ -40,6 +41,11 @@ public class ExpenseExceptionHandler {
     @ExceptionHandler(ExpenseQueryException.class)
     public ModelAndView badQuery(ExpenseQueryException exception) {
         return error(HttpStatus.BAD_REQUEST, "入力を確認してください", exception.getMessage(), "/expenses", null);
+    }
+
+    @ExceptionHandler(ExpenseExportLimitException.class)
+    public ModelAndView exportLimit(ExpenseExportLimitException exception) {
+        return error(HttpStatus.BAD_REQUEST, "CSVを出力できません", exception.getMessage(), "/expenses", null);
     }
 
     @ExceptionHandler(ExpenseInputException.class)

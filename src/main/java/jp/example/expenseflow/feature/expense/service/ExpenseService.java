@@ -1,6 +1,7 @@
 package jp.example.expenseflow.feature.expense.service;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.DateTimeException;
 import java.time.Instant;
@@ -39,6 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ExpenseService {
 
     public static final int PAGE_SIZE = 20;
+    public static final int CSV_EXPORT_LIMIT = 1000;
     public static final ZoneId DISPLAY_ZONE = ZoneId.of("Asia/Tokyo");
 
     private static final DateTimeFormatter DISPLAY_TIME_FORMAT =
@@ -80,15 +82,8 @@ public class ExpenseService {
         SearchCriteria criteria = parseSearch(statusValue, categoryValue, fromValue, toValue,
                 query, pageNumber);
         CurrentUser currentUser = currentUserService.require(username);
-        PageRequest pageRequest = PageRequest.of(criteria.pageNumber(), PAGE_SIZE,
-                Sort.by(Sort.Order.desc("updatedAt"), Sort.Order.desc("id")));
-        Page<ExpenseRequest> requests = criteria.query() == null
-                ? expenseRequestRepository.findOwnPageWithoutQuery(
-                        currentUser.id(), criteria.status(), criteria.category(), criteria.fromDate(),
-                        criteria.toDate(), pageRequest)
-                : expenseRequestRepository.findOwnPage(
-                        currentUser.id(), criteria.status(), criteria.category(), criteria.fromDate(),
-                        criteria.toDate(), escapeLike(criteria.query()), pageRequest);
+        PageRequest pageRequest = ownPageRequest(criteria.pageNumber(), PAGE_SIZE);
+        Page<ExpenseRequest> requests = findOwnPage(currentUser.id(), criteria, pageRequest);
 
         List<ExpenseListItem> items = requests.getContent().stream()
                 .map(this::toListItem)
@@ -97,6 +92,39 @@ public class ExpenseService {
                 requests.getNumber(), requests.hasPrevious(), requests.hasNext(),
                 criteria.statusValue(), criteria.categoryValue(), criteria.fromValue(),
                 criteria.toValue(), criteria.query());
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] exportCsv(String username, String statusValue, String categoryValue,
+                            String fromValue, String toValue, String query) {
+        SearchCriteria criteria = parseSearch(statusValue, categoryValue, fromValue, toValue,
+                query, 0);
+        CurrentUser currentUser = currentUserService.require(username);
+        PageRequest pageRequest = ownPageRequest(0, CSV_EXPORT_LIMIT + 1);
+        Page<ExpenseRequest> requests = findOwnPage(currentUser.id(), criteria, pageRequest);
+        if (requests.getNumberOfElements() > CSV_EXPORT_LIMIT) {
+            throw new ExpenseExportLimitException();
+        }
+        List<ExpenseListItem> items = requests.getContent().stream()
+                .map(this::toListItem)
+                .toList();
+        return toCsv(items);
+    }
+
+    private PageRequest ownPageRequest(int pageNumber, int pageSize) {
+        return PageRequest.of(pageNumber, pageSize,
+                Sort.by(Sort.Order.desc("updatedAt"), Sort.Order.desc("id")));
+    }
+
+    private Page<ExpenseRequest> findOwnPage(Long applicantId, SearchCriteria criteria,
+                                              PageRequest pageRequest) {
+        return criteria.query() == null
+                ? expenseRequestRepository.findOwnPageWithoutQuery(
+                        applicantId, criteria.status(), criteria.category(), criteria.fromDate(),
+                        criteria.toDate(), pageRequest)
+                : expenseRequestRepository.findOwnPage(
+                        applicantId, criteria.status(), criteria.category(), criteria.fromDate(),
+                        criteria.toDate(), escapeLike(criteria.query()), pageRequest);
     }
 
     @Transactional(readOnly = true)
@@ -445,6 +473,61 @@ public class ExpenseService {
                 request.getStatus().name(),
                 STATUS_LABELS.get(request.getStatus()),
                 formatInstant(request.getUpdatedAt()));
+    }
+
+    private byte[] toCsv(List<ExpenseListItem> items) {
+        StringBuilder csv = new StringBuilder("\uFEFF");
+        appendCsvRow(csv, List.of("ID", "件名", "分類", "利用日", "金額", "状態", "更新日時"));
+        for (ExpenseListItem item : items) {
+            appendCsvRow(csv, List.of(
+                    item.getId().toString(),
+                    protectCsvFormula(item.getTitle()),
+                    protectCsvFormula(item.getCategoryLabel()),
+                    protectCsvFormula(item.getExpenseDate()),
+                    item.getAmount(),
+                    protectCsvFormula(item.getStatusLabel()),
+                    protectCsvFormula(item.getUpdatedAt())));
+        }
+        return csv.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    private void appendCsvRow(StringBuilder csv, List<String> values) {
+        for (int index = 0; index < values.size(); index++) {
+            if (index > 0) {
+                csv.append(',');
+            }
+            csv.append(escapeCsv(values.get(index)));
+        }
+        csv.append("\r\n");
+    }
+
+    private String escapeCsv(String value) {
+        String actual = value == null ? "" : value;
+        if (actual.indexOf('"') >= 0 || actual.indexOf(',') >= 0
+                || actual.indexOf('\r') >= 0 || actual.indexOf('\n') >= 0) {
+            return '"' + actual.replace("\"", "\"\"") + '"';
+        }
+        return actual;
+    }
+
+    private String protectCsvFormula(String value) {
+        if (value == null || value.isEmpty()) {
+            return value;
+        }
+        int firstNonWhitespace = 0;
+        while (firstNonWhitespace < value.length()
+                && Character.isWhitespace(value.charAt(firstNonWhitespace))) {
+            firstNonWhitespace++;
+        }
+        if (firstNonWhitespace == value.length()) {
+            return value;
+        }
+        char first = value.charAt(firstNonWhitespace);
+        if (first == '=' || first == '+' || first == '-' || first == '@'
+                || Character.isISOControl(first)) {
+            return "'" + value;
+        }
+        return value;
     }
 
     private ApprovalListItem toApprovalListItem(ExpenseRequest request) {
