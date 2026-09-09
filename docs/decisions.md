@@ -20,3 +20,14 @@
 - demoデータはJavaの `ApplicationRunner` でdemoプロファイル時だけ冪等投入する。通常プロファイルではユーザーを自動生成しない。
 - テストはTestcontainersのPostgreSQLを前提にする。Dockerが利用できない環境では、テストコードを残し、実行不能の理由を `docs/test-results.md` に記録する。
 
+## 2026-09-09：Spring Boot 4.1.1のテスト・DB依存関係
+
+- Spring Boot 4.1.1とJava 21は維持する。Testcontainers 2.0.2では、存在する成果物名である`testcontainers-junit-jupiter`と`testcontainers-postgresql`を使用する。
+- Spring Boot 4のテスト分割に合わせ、`spring-boot-starter-webmvc-test`と`org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc`を使用する。
+- Flywayの自動構成に必要な`spring-boot-starter-flyway`を追加する。Flywayの適用先は引き続きPostgreSQLのみとし、H2へ置換しない。
+
+## 2026-09-09：フェーズ1の検証方法
+
+- ローカル環境にJava 21とDockerがないため、Java 21・PostgreSQL 17・Dockerを提供するGitHub Actionsを実行環境とした。依存取得ができないローカルの失敗を成功扱いにはしていない。
+- Compose smoke testでは、HTMLからCSRFトークンを取得してログインとPOSTログアウトを行い、DBをボリューム削除なしで再作成して永続化を検証する。
+- ログイン後のプレースホルダー画面では、未導入のThymeleaf Security dialectに依存せず、認証済みユーザー名をコントローラーからモデルへ渡す。フェーズ2の申請・承認処理は追加していない。
