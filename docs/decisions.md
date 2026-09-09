@@ -50,3 +50,10 @@
 - 編集POSTの対象は常に`@PathVariable id`とし、入力エラー・version型変換エラーの再表示でも`/expenses/{id}/edit`と元申請へのキャンセル先をサーバー側で組み立てる。フォームから送信された`id`は更新対象と再表示先の決定に使わない。
 - version型変換エラーはhidden項目だけで終わらせず、編集画面に項目別の日本語エラーを表示する。Serviceの認可とversion検証は従来どおり維持する。
 - 同時更新テストは`TransactionTemplate`で独立したPostgreSQLトランザクションを作り、両者がversion 0を読み終えた後に更新する`CyclicBarrier`を置く。Futureとbarrierにタイムアウトを設け、成功1件・楽観ロック例外を含む失敗1件、勝者の内容・version・履歴を確認する。サービスの事前version比較は別のHTTPテストで検証し、DBの`@Version`検知と混同しない。
+
+## 2026-09-09：フェーズ3の承認・差戻し
+
+- 承認待ち一覧の検索条件を`department_id`、本人以外、`SUBMITTED`へ固定し、承認操作の対象認可も同じService判定を通す。社員の承認操作は403、承認者から見えない自己処理・他部署・DRAFTは404、同部署で見えるがSUBMITTEDではない対象の操作は409とした。
+- APPROVERの承認・差戻しは、対象の認可、version比較、状態遷移、履歴保存を1つの`@Transactional`メソッドに置いた。コメントのtrim・長さ検証を状態変更前に行い、履歴保存に失敗した場合は状態とversionもロールバックする。
+- 承認コメントは任意、差戻し理由は必須とし、画面のボタン非表示だけで権限を守らず、検索クエリ・Service・HTTPテストの3箇所で確認する。自分の申請を承認できる別の管理者ロールは追加せず、EMPLOYEEとAPPROVERだけを維持する。
+- RETURNEDからの再申請は既存の本人操作を再利用し、`submitted_at`をClockの現在時刻へ更新してSUBMIT履歴を追加する。APPROVE／RETURNには追加マイグレーションを作らず、既存V1の状態・履歴制約を利用する。

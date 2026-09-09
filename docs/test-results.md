@@ -55,3 +55,29 @@ GitHub Actions [run 34358530765](https://github.com/unitier0214/expense-flow/act
 - リポジトリ：https://github.com/unitier0214/expense-flow
 - フェーズ2検証コミット：https://github.com/unitier0214/expense-flow/commit/ebe33218eef7000932f450de8103db9e0a746ef2
 - フェーズ2検証CI：https://github.com/unitier0214/expense-flow/actions/runs/34358530765
+
+## フェーズ3：承認・差戻し（2026-09-09）
+
+### 実行環境と対象
+
+対象SHAは [`43dcf3791b6834f540b540a46d3349e2159af7a5`](https://github.com/unitier0214/expense-flow/commit/43dcf3791b6834f540b540a46d3349e2159af7a5)。GitHub Actions [run 34397993092](https://github.com/unitier0214/expense-flow/actions/runs/34397993092) のJava 21 runner、PostgreSQL 17.11、Docker環境で実行した。過去のCI結果は今回のコードの成功判定へ流用していない。
+
+### 結果
+
+| 検証 | 結果 |
+|---|---|
+| `./mvnw --batch-mode test` | 成功。42テスト、失敗0、エラー0、スキップ0 |
+| `./mvnw --batch-mode verify` | 成功。パッケージングまで完了 |
+| `docker compose config --quiet` | 成功 |
+| 既存Compose smoke | 成功。DB readiness、healthcheck、demoログイン、作成・編集・申請、詳細・履歴、POSTログアウト、保護URL再認証、DB永続化を確認 |
+| 承認待ち一覧 | 同部署・本人以外・SUBMITTEDのみ、`submitted_at ASC, id ASC`、20件ページングを確認 |
+| 承認・差戻し | APPROVERの正常処理、任意コメント、理由必須・trim・上限、RETURNED後の再申請、承認済み・差戻し済みの不正遷移を確認 |
+| 認可 | 社員403、自己処理・他部署・DRAFT対象404、同部署承認者の閲覧と操作を確認 |
+| 競合 | 独立PostgreSQLトランザクションで同時承認、承認対差戻しを検証し、成功1件・楽観ロック競合1件、履歴1件を確認 |
+| ロールバック | APPROVE／RETURN履歴保存をテスト用DBトリガーで失敗させ、状態・version・履歴をロールバック |
+
+初回CI [run 34397625063](https://github.com/unitier0214/expense-flow/actions/runs/34397625063) はversion欠落エラーを画面に表示していなかったため失敗した。詳細画面にversionエラー表示を追加し、上記の新しいSHAで再実行して成功した。失敗を隠すためのテスト無効化・スキップは行っていない。
+
+### ローカル未実行
+
+ローカルでは引き続きJava 21依存を取得するMaven Centralの名前解決とDocker CLIが利用できないため、`test`／`verify`、Testcontainers、Compose、アプリ起動、実ブラウザ目視は未実行。上記はCIで実DB・Dockerを使って検証した結果であり、curlによるHTTP確認を実ブラウザ確認とは呼んでいない。
