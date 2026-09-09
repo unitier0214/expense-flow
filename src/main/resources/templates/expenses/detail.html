@@ -62,6 +62,8 @@
         <div th:if="${hasApprovalError}" class="alert alert-error" role="alert">
             入力内容を確認してください。
         </div>
+        <p th:if="${approvalErrors.containsKey('version')}" class="field-error"
+           th:text="${approvalErrors['version']}" role="alert">versionエラー</p>
         <form method="post" th:action="@{/expenses/{id}/approve(id=${detail.id})}" class="approval-form">
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
             <input type="hidden" name="version" th:value="${detail.version}">
