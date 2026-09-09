@@ -6,7 +6,7 @@
 ## 結論
 
 - フェーズ1「基盤とログイン」は完了済み。
-- `main` の最終コミットは [`d37c6b29`](https://github.com/unitier0214/expense-flow/commit/d37c6b29e3270ea689b49a6559eee7ff76212220)（`docs: record phase 1 completion`）。
+- フェーズ1の実装・検証を含む基準コミットは [`d37c6b29`](https://github.com/unitier0214/expense-flow/commit/d37c6b29e3270ea689b49a6559eee7ff76212220)（`docs: record phase 1 completion`）。
 - Java 21、Spring Boot 4.1.1、PostgreSQL 17.11、Docker Composeを前提に、CI検証は成功済み。
 - フェーズ2以降の申請・承認機能にはまだ着手していない。
 
@@ -52,7 +52,7 @@
 
 ## 検証結果
 
-最終main CI：[run 34349519353](https://github.com/unitier0214/expense-flow/actions/runs/34349519353)
+フェーズ1基準CI：[run 34349519353](https://github.com/unitier0214/expense-flow/actions/runs/34349519353)
 
 | 検証 | 結果 |
 |---|---|
@@ -103,5 +103,5 @@
 ## 参照リンク
 
 - リポジトリ：https://github.com/unitier0214/expense-flow
-- 最終コミット：https://github.com/unitier0214/expense-flow/commit/d37c6b29e3270ea689b49a6559eee7ff76212220
-- 最終main CI：https://github.com/unitier0214/expense-flow/actions/runs/34349519353
+- フェーズ1基準コミット：https://github.com/unitier0214/expense-flow/commit/d37c6b29e3270ea689b49a6559eee7ff76212220
+- フェーズ1基準CI：https://github.com/unitier0214/expense-flow/actions/runs/34349519353
