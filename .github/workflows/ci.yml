@@ -125,8 +125,11 @@ jobs:
               --data-urlencode "_csrf=$login_csrf" http://localhost:8080/login)
             echo "login $username HTTP status: $login_status"
             test "$login_status" = "302"
-            echo "login $username Location: $(location_path "$login_headers_path")"
-            grep -qiE '^location: (http://localhost:8080)?/expenses' "$login_headers_path"
+            local login_location
+            login_location=$(awk 'tolower($1) == "location:" { sub(/\r$/, "", $2); print $2; exit }' "$login_headers_path")
+            login_location="${login_location#http://localhost:8080}"
+            echo "login $username Location: $login_location"
+            test "$login_location" = "/expenses"
           }
           curl --fail --silent --cookie-jar "$cookies" --output "$login_page" http://localhost:8080/login
           grep -q '経費申請・承認システム' "$login_page"
@@ -245,8 +248,6 @@ jobs:
           grep -q 'Compose smoke申請（編集済み）' "$returned_employee_detail_page"
           grep -q '差戻し' "$returned_employee_detail_page"
           grep -q 'CIで確認した差戻し理由' "$returned_employee_detail_page"
-          returned_edit_csrf=$(extract_csrf "$returned_employee_detail_page")
-          returned_edit_version=$(extract_input "$returned_employee_detail_page" version)
           curl --fail --silent --cookie "$cookies" --output "$edit_page" "http://localhost:8080$expense_path/edit"
           returned_edit_csrf=$(extract_csrf "$edit_page")
           returned_edit_version=$(extract_input "$edit_page" version)
