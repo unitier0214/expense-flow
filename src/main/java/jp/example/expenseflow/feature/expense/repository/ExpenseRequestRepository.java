@@ -19,20 +19,20 @@ public interface ExpenseRequestRepository extends JpaRepository<ExpenseRequest, 
             select e
             from ExpenseRequest e
             where e.applicant.id = :applicantId
-              and (:status is null or e.status = :status)
-              and (:category is null or e.category = :category)
-              and (:fromDate is null or e.expenseDate >= :fromDate)
-              and (:toDate is null or e.expenseDate <= :toDate)
+              and e.status = coalesce(:status, e.status)
+              and e.category = coalesce(:category, e.category)
+              and e.expenseDate >= coalesce(:fromDate, e.expenseDate)
+              and e.expenseDate <= coalesce(:toDate, e.expenseDate)
               and upper(e.title) like upper(concat('%', :q, '%')) escape '\\'
             """,
             countQuery = """
             select count(e)
             from ExpenseRequest e
             where e.applicant.id = :applicantId
-              and (:status is null or e.status = :status)
-              and (:category is null or e.category = :category)
-              and (:fromDate is null or e.expenseDate >= :fromDate)
-              and (:toDate is null or e.expenseDate <= :toDate)
+              and e.status = coalesce(:status, e.status)
+              and e.category = coalesce(:category, e.category)
+              and e.expenseDate >= coalesce(:fromDate, e.expenseDate)
+              and e.expenseDate <= coalesce(:toDate, e.expenseDate)
               and upper(e.title) like upper(concat('%', :q, '%')) escape '\\'
             """)
     Page<ExpenseRequest> findOwnPage(@Param("applicantId") Long applicantId,
@@ -48,19 +48,19 @@ public interface ExpenseRequestRepository extends JpaRepository<ExpenseRequest, 
             select e
             from ExpenseRequest e
             where e.applicant.id = :applicantId
-              and (:status is null or e.status = :status)
-              and (:category is null or e.category = :category)
-              and (:fromDate is null or e.expenseDate >= :fromDate)
-              and (:toDate is null or e.expenseDate <= :toDate)
+              and e.status = coalesce(:status, e.status)
+              and e.category = coalesce(:category, e.category)
+              and e.expenseDate >= coalesce(:fromDate, e.expenseDate)
+              and e.expenseDate <= coalesce(:toDate, e.expenseDate)
             """,
             countQuery = """
             select count(e)
             from ExpenseRequest e
             where e.applicant.id = :applicantId
-              and (:status is null or e.status = :status)
-              and (:category is null or e.category = :category)
-              and (:fromDate is null or e.expenseDate >= :fromDate)
-              and (:toDate is null or e.expenseDate <= :toDate)
+              and e.status = coalesce(:status, e.status)
+              and e.category = coalesce(:category, e.category)
+              and e.expenseDate >= coalesce(:fromDate, e.expenseDate)
+              and e.expenseDate <= coalesce(:toDate, e.expenseDate)
             """)
     Page<ExpenseRequest> findOwnPageWithoutQuery(@Param("applicantId") Long applicantId,
                                                   @Param("status") ExpenseStatus status,
