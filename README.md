@@ -15,6 +15,7 @@ Java / Spring Bootで作る、架空企業向けの経費申請・承認シス�
 - DRAFT / RETURNEDの編集、DRAFTのみ削除、本人だけの変更操作
 - 同部署APPROVERによるDRAFT以外の詳細・履歴閲覧
 - 承認待ち一覧（本人以外・同部署・SUBMITTED、20件ページング）
+- 承認待ち一覧の状態ラベル、申請詳細の状態・履歴・承認／差戻しフォーム
 - 同部署の別APPROVERによる承認・理由付き差戻し、RETURNEDからの本人再申請
 - PostgreSQL側の絞り込み・ページング、CSRF、楽観ロック、トランザクション内の履歴保存
 
@@ -80,3 +81,4 @@ DB接続先は環境変数で変更できます。詳細は `.env.example` を�
 - [テスト結果](docs/test-results.md)
 - [デモ手順](docs/demo-script.md)
 - [学習ガイド](docs/learning-guide.md)
+- [フェーズ4現状報告](docs/Astra_expense-flow_status_phase4_2026-09-09.md)

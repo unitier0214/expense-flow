@@ -56,9 +56,29 @@
 - 同時承認、承認対差戻しを独立トランザクションで検証し、成功1件・楽観ロック競合1件、履歴1件を確認した。
 - 対象コミットは [`43dcf379`](https://github.com/unitier0214/expense-flow/commit/43dcf3791b6834f540b540a46d3349e2159af7a5)、CIは [run 34397993092](https://github.com/unitier0214/expense-flow/actions/runs/34397993092)。42テスト、失敗0・エラー0・スキップ0、verify・Compose smokeも成功した。
 
-## フェーズ4への申し送り
+## フェーズ4：アプリと説明資料の仕上げ（完了）
 
-- demoプロファイルの申請45件を状態分散・履歴整合・冪等投入へ拡張する。
-- 社員の作成→編集→申請→差戻し→修正・再申請→別承認者の承認というCompose smokeと、画面・説明資料を仕上げる。
-- T01〜T12の回帰を維持し、実ブラウザ確認ができない場合はHTTP検証と区別して記録する。
-- CSVはフェーズ5として、必須機能完成コミットの後に独立した追加機能として実装する。
+- demoプロファイルへ営業部23件・開発部22件、合計45件の申請を状態分散（DRAFT／SUBMITTED／RETURNED／APPROVED）して投入し、CREATEから各状態に至る履歴も整合させた。
+- `DemoDataInitializerIntegrationTest`で初回投入と再実行を確認し、既存件数・既存の編集内容・既存履歴を上書きしないことを検証した。通常プロファイルでは初期化しない。
+- 社員の作成→編集→申請→同部署承認者の差戻し→本人の修正・再申請→別承認者の承認をCompose smokeへ追加した。各フォームからCSRFとversionをHTML解析で取得し、固定値に依存していない。
+- 承認待ち一覧へ状態ラベルを追加し、詳細の最終状態・差戻し理由・承認コメント・履歴を対象申請の内容として確認するようsmokeを整えた。
+- 白背景・濃紺ナビ、共通ヘッダー、入力エラーの`aria-describedby`、フォーカス表示、スマートフォン幅のフォーム操作を整え、`docs/learning-guide.md`を追加した。
+- Phase4の実装・資料検証対象は [`f7182a10`](https://github.com/unitier0214/expense-flow/commit/f7182a10c71e23e3839b22719aac88f1c365e91a)。[CI run 34402776016](https://github.com/unitier0214/expense-flow/actions/runs/34402776016)でJava 21のtest／verify、Compose設定、DB付きsmokeをすべて成功させた。
+
+### フェーズ4検証時の修正履歴
+
+- [run 34400373220](https://github.com/unitier0214/expense-flow/actions/runs/34400373220)：失敗。Compose smokeが承認者ログイン後に停止したため、ログインのLocationと承認画面のHTTP statusを出力して切り分けた。
+- [run 34401685105](https://github.com/unitier0214/expense-flow/actions/runs/34401685105)：失敗。承認待ち一覧に対象の状態ラベルがなく、対象申請の状態確認が成立していなかったため、一覧表示を修正した。
+- [run 34402776016](https://github.com/unitier0214/expense-flow/actions/runs/34402776016)：成功。42テスト、失敗0・エラー0・スキップ0。Compose smokeは作成から承認、ログアウト後の保護URL拒否、DB永続化まで完了した。
+
+## フェーズ5への申し送り
+
+- CSVはこのフェーズ4完了コミットの後に、独立した追加機能として実装する。
+- `GET /expenses/export.csv`を本人一覧と同じ検索・認可・並び順で実装し、ページングを外した全件抽出、1000件上限、UTF-8 BOM、RFC 4180相当の引用、数式対策を追加する。
+- T13と既存T01〜T12を回帰実行し、CSV追加後の対象SHAとCI URLを新たに記録する。
+
+### ローカル検証の制約
+
+- ローカルの標準Javaは17.0.20で、Java 21を明示したMaven実行もMaven Centralの名前解決失敗により依存取得前に終了した。
+- Docker CLIがないため、ローカルTestcontainers、Compose、アプリ起動、実ブラウザ目視、スクリーンショット取得は未実行。GitHub ActionsではJava 21・PostgreSQL 17.11・Dockerを使ったHTTP smokeを実行したが、curl検証をブラウザ確認とは呼んでいない。
+- テストの無効化・スキップ、H2やモックDBへの置換は行っていない。

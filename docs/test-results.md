@@ -81,3 +81,35 @@ GitHub Actions [run 34358530765](https://github.com/unitier0214/expense-flow/act
 ### ローカル未実行
 
 ローカルでは引き続きJava 21依存を取得するMaven Centralの名前解決とDocker CLIが利用できないため、`test`／`verify`、Testcontainers、Compose、アプリ起動、実ブラウザ目視は未実行。上記はCIで実DB・Dockerを使って検証した結果であり、curlによるHTTP確認を実ブラウザ確認とは呼んでいない。
+
+## フェーズ4：アプリと説明資料の仕上げ（2026-09-09）
+
+### 実行環境と対象
+
+対象SHAは [`f7182a10c71e23e3839b22719aac88f1c365e91a`](https://github.com/unitier0214/expense-flow/commit/f7182a10c71e23e3839b22719aac88f1c365e91a)。GitHub Actions [run 34402776016](https://github.com/unitier0214/expense-flow/actions/runs/34402776016)のUbuntu runnerで、Java 21、Spring Boot 4.1.1、PostgreSQL 17.11、Docker Composeを使用した。これはPhase4対象SHAの新規実行であり、Phase3以前のCI結果を流用していない。
+
+### 結果
+
+| 検証 | 結果 |
+|---|---|
+| `./mvnw --batch-mode test` | 成功。42テスト、失敗0、エラー0、スキップ0（ExpenseIntegrationTest 19、ApprovalIntegrationTest 10、SecurityIntegrationTest 12、DemoDataInitializerIntegrationTest 1） |
+| `./mvnw --batch-mode verify` | 成功。上記42テストとパッケージングが完了 |
+| `docker compose config --quiet` | 成功 |
+| demo初期データ | 成功。営業部23件・開発部22件、合計45件をDRAFT／SUBMITTED／RETURNED／APPROVEDへ分散し、状態と履歴を整合させて投入。再実行時に既存データを上書きしないことをTestcontainersで確認 |
+| Compose smoke | 成功。healthcheck後、社員の作成→編集→申請、同部署承認者1による理由付き差戻し、社員の修正・再申請、別承認者2による承認、対象申請の状態・理由・コメント・履歴、POSTログアウト、保護URLの302、DB永続化を確認 |
+| CSRF／version | 成功。smokeがログイン・各フォーム・ログアウトのHTMLから値を抽出し、固定token／versionを使わずPOSTした |
+| UI整備 | 成功。共通ヘッダー、承認待ちの状態ラベル、入力エラーの対応付け、フォーカス表示、スマートフォン幅の主要フォーム操作をコードとテンプレートで整備 |
+
+### Phase4で発生した失敗と修正
+
+- [run 34400373220](https://github.com/unitier0214/expense-flow/actions/runs/34400373220)：失敗。Compose smokeの承認者ログイン後で停止したため、ログインLocationと承認画面HTTP statusの診断出力を追加した。
+- [run 34401685105](https://github.com/unitier0214/expense-flow/actions/runs/34401685105)：失敗。承認待ち一覧HTMLに対象状態ラベルがなく、smokeの`申請中`確認が成立していなかった。承認待ち一覧へ対象行の状態ラベルを追加した。
+- [run 34402776016](https://github.com/unitier0214/expense-flow/actions/runs/34402776016)：上記修正後の成功。test／verify／Compose smokeがすべて成功した。
+
+### ローカル未実行
+
+ローカルの標準Javaは17.0.20で、Java 21を指定したMaven実行も`repo.maven.apache.org`の名前解決失敗により依存取得前に終了した。Docker CLIがないためローカルTestcontainers、Compose、アプリ起動、実ブラウザ目視、スクリーンショット取得も未実行である。CIのcurlによる実HTTP・HTML検証をブラウザ確認とは呼んでいない。テストの無効化・スキップやH2置換は行っていない。
+
+### フェーズ5への境界
+
+CSV出力はまだ実装していない。Phase4の必須機能完成を [`f7182a10`](https://github.com/unitier0214/expense-flow/commit/f7182a10c71e23e3839b22719aac88f1c365e91a) として記録し、CSVはこのコミット以後の独立変更で実装する。
