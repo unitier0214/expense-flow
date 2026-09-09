@@ -2,6 +2,7 @@ package jp.example.expenseflow.feature.expense.web;
 
 import java.util.UUID;
 import jp.example.expenseflow.feature.expense.service.ExpenseConflictException;
+import jp.example.expenseflow.feature.expense.service.ExpenseForbiddenException;
 import jp.example.expenseflow.feature.expense.service.ExpenseInputException;
 import jp.example.expenseflow.feature.expense.service.ExpenseNotFoundException;
 import jp.example.expenseflow.feature.expense.service.ExpenseQueryException;
@@ -66,6 +67,11 @@ public class ExpenseExceptionHandler {
 
     @ExceptionHandler(AccessDeniedException.class)
     public ModelAndView forbidden() {
+        return error(HttpStatus.FORBIDDEN, "操作できません", "この操作を行う権限がありません。", "/expenses", null);
+    }
+
+    @ExceptionHandler(ExpenseForbiddenException.class)
+    public ModelAndView expenseForbidden() {
         return error(HttpStatus.FORBIDDEN, "操作できません", "この操作を行う権限がありません。", "/expenses", null);
     }
 

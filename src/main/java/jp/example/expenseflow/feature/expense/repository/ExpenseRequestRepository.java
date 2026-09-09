@@ -70,6 +70,19 @@ public interface ExpenseRequestRepository extends JpaRepository<ExpenseRequest, 
                                                   Pageable pageable);
 
     @EntityGraph(attributePaths = {"applicant", "department"})
+    @Query("""
+            select e
+            from ExpenseRequest e
+            where e.department.id = :departmentId
+              and e.applicant.id <> :approverId
+              and e.status = :status
+            """)
+    Page<ExpenseRequest> findApprovalPage(@Param("departmentId") Long departmentId,
+                                          @Param("approverId") Long approverId,
+                                          @Param("status") ExpenseStatus status,
+                                          Pageable pageable);
+
+    @EntityGraph(attributePaths = {"applicant", "department"})
     @Query("select e from ExpenseRequest e where e.id = :id")
     Optional<ExpenseRequest> findWithRelationsById(@Param("id") Long id);
 }

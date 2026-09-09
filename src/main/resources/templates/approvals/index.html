@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>承認待ち | ExpenseFlow</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<div th:replace="~{fragments/header :: header}"></div>
+<main class="page-shell" aria-labelledby="page-title">
+    <div class="page-heading">
+        <div>
+            <p class="eyebrow">ExpenseFlow</p>
+            <h1 id="page-title">承認待ち</h1>
+        </div>
+        <a class="button button-secondary" th:href="@{/expenses}">自分の申請</a>
+    </div>
+
+    <section class="panel results-panel" aria-labelledby="results-title">
+        <div class="section-heading">
+            <h2 id="results-title">承認待ち申請</h2>
+            <p class="muted" th:text="|${page.totalElements}件|">0件</p>
+        </div>
+        <div th:if="${#lists.isEmpty(page.items)}" class="empty-state">
+            <p>承認待ちの申請はありません。</p>
+        </div>
+        <div th:unless="${#lists.isEmpty(page.items)}" class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th scope="col">申請者</th>
+                    <th scope="col">件名</th>
+                    <th scope="col">分類</th>
+                    <th scope="col">利用日</th>
+                    <th scope="col" class="amount-cell">金額</th>
+                    <th scope="col">申請日時</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="item : ${page.items}">
+                    <td th:text="|${item.applicantName}（${item.applicantUsername}）|">申請者</td>
+                    <td><a th:href="@{/expenses/{id}(id=${item.id})}" th:text="${item.title}">件名</a></td>
+                    <td th:text="${item.categoryLabel}">交通費</td>
+                    <td th:text="${item.expenseDate}">2026-09-01</td>
+                    <td class="amount-cell" th:text="|${item.amount}円|">1,000円</td>
+                    <td th:text="${item.submittedAt}">2026/09/09 20:00</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <nav th:if="${page.totalPages > 1}" class="pagination" aria-label="承認待ちページ移動">
+            <a th:if="${page.hasPrevious}"
+               th:href="@{/approvals(page=${page.number - 1})}">前へ</a>
+            <span th:text="|${page.number + 1} / ${page.totalPages}|">1 / 1</span>
+            <a th:if="${page.hasNext}"
+               th:href="@{/approvals(page=${page.number + 1})}">次へ</a>
+        </nav>
+    </section>
+</main>
+</body>
+</html>

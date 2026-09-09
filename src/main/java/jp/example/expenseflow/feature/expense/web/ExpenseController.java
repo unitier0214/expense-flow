@@ -4,6 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import jp.example.expenseflow.feature.expense.service.ExpenseInputException;
 import jp.example.expenseflow.feature.expense.service.ExpenseService;
+import jp.example.expenseflow.feature.expense.service.dto.ApprovalForm;
 import jp.example.expenseflow.feature.expense.service.dto.ExpenseDetailView;
 import jp.example.expenseflow.feature.expense.service.dto.ExpenseForm;
 import jp.example.expenseflow.feature.expense.service.dto.ExpenseListPage;
@@ -45,6 +46,7 @@ public class ExpenseController {
                 category, from, to, q, page);
         ModelAndView model = new ModelAndView("expenses/index");
         model.addObject("currentUsername", authentication.getName());
+        model.addObject("currentIsApprover", expenseService.isApprover(authentication.getName()));
         model.addObject("page", listPage);
         model.addObject("statuses", ExpenseService.statusLabels());
         model.addObject("categories", ExpenseService.categoryLabels());
@@ -80,7 +82,10 @@ public class ExpenseController {
         ExpenseDetailView detail = expenseService.findVisible(authentication.getName(), id);
         ModelAndView model = new ModelAndView("expenses/detail");
         model.addObject("currentUsername", authentication.getName());
+        model.addObject("currentIsApprover", expenseService.isApprover(authentication.getName()));
         model.addObject("detail", detail);
+        model.addObject("approvalForm", new ApprovalForm());
+        model.addObject("approvalErrors", Map.of());
         return model;
     }
 
@@ -127,6 +132,7 @@ public class ExpenseController {
                                    String username) {
         ModelAndView model = new ModelAndView("expenses/form");
         model.addObject("currentUsername", username);
+        model.addObject("currentIsApprover", expenseService.isApprover(username));
         model.addObject("form", form);
         model.addObject("isEdit", edit);
         model.addObject("editTargetId", editTargetId);

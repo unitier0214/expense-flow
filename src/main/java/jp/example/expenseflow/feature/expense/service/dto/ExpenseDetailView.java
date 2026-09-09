@@ -23,13 +23,15 @@ public class ExpenseDetailView {
     private final boolean canEdit;
     private final boolean canDelete;
     private final boolean canSubmit;
+    private final boolean canApprove;
 
     public ExpenseDetailView(Long id, String applicantName, String applicantUsername,
                              String departmentName, String title, String purpose,
                              String categoryLabel, String expenseDate, String amount,
                              String status, String statusLabel, long version, String createdAt,
                              String updatedAt, String submittedAt, List<ExpenseEventView> events,
-                             boolean canEdit, boolean canDelete, boolean canSubmit) {
+                             boolean canEdit, boolean canDelete, boolean canSubmit,
+                             boolean canApprove) {
         this.id = id;
         this.applicantName = applicantName;
         this.applicantUsername = applicantUsername;
@@ -49,6 +51,7 @@ public class ExpenseDetailView {
         this.canEdit = canEdit;
         this.canDelete = canDelete;
         this.canSubmit = canSubmit;
+        this.canApprove = canApprove;
     }
 
     public Long getId() {
@@ -125,5 +128,9 @@ public class ExpenseDetailView {
 
     public boolean isCanSubmit() {
         return canSubmit;
+    }
+
+    public boolean isCanApprove() {
+        return canApprove;
     }
 }

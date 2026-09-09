@@ -54,6 +54,42 @@
         </div>
     </section>
 
+    <section th:if="${detail.canApprove}" class="panel approval-panel" aria-labelledby="approval-title">
+        <div class="section-heading">
+            <h2 id="approval-title">承認・差戻し</h2>
+            <span class="muted">同じ部署の申請を確認してください</span>
+        </div>
+        <div th:if="${hasApprovalError}" class="alert alert-error" role="alert">
+            入力内容を確認してください。
+        </div>
+        <form method="post" th:action="@{/expenses/{id}/approve(id=${detail.id})}" class="approval-form">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <input type="hidden" name="version" th:value="${detail.version}">
+            <div class="form-field">
+                <label for="approval-comment">承認コメント（任意）</label>
+                <textarea id="approval-comment" name="comment" maxlength="500"
+                          aria-describedby="approval-comment-error"
+                          th:text="${approvalForm.comment}"></textarea>
+                <p id="approval-comment-error" th:if="${approvalErrors.containsKey('comment')}"
+                   class="field-error" th:text="${approvalErrors['comment']}" role="alert">コメントエラー</p>
+            </div>
+            <button class="button button-primary" type="submit">承認する</button>
+        </form>
+        <form method="post" th:action="@{/expenses/{id}/return(id=${detail.id})}" class="approval-form">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <input type="hidden" name="version" th:value="${detail.version}">
+            <div class="form-field">
+                <label for="return-comment">差戻し理由（必須）</label>
+                <textarea id="return-comment" name="comment" maxlength="500"
+                          aria-describedby="return-comment-error"
+                          th:text="${approvalForm.comment}"></textarea>
+                <p id="return-comment-error" th:if="${approvalErrors.containsKey('comment')}"
+                   class="field-error" th:text="${approvalErrors['comment']}" role="alert">理由エラー</p>
+            </div>
+            <button class="button button-danger" type="submit">差し戻す</button>
+        </form>
+    </section>
+
     <section class="panel" aria-labelledby="history-title">
         <div class="section-heading">
             <h2 id="history-title">履歴</h2>

@@ -26,6 +26,9 @@ import jp.example.expenseflow.feature.expense.service.dto.ExpenseEventView;
 import jp.example.expenseflow.feature.expense.service.dto.ExpenseForm;
 import jp.example.expenseflow.feature.expense.service.dto.ExpenseListItem;
 import jp.example.expenseflow.feature.expense.service.dto.ExpenseListPage;
+import jp.example.expenseflow.feature.expense.service.dto.ApprovalForm;
+import jp.example.expenseflow.feature.expense.service.dto.ApprovalListItem;
+import jp.example.expenseflow.feature.expense.service.dto.ApprovalListPage;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -94,6 +97,36 @@ public class ExpenseService {
                 requests.getNumber(), requests.hasPrevious(), requests.hasNext(),
                 criteria.statusValue(), criteria.categoryValue(), criteria.fromValue(),
                 criteria.toValue(), criteria.query());
+    }
+
+    @Transactional(readOnly = true)
+    public ApprovalListPage findApprovals(String username, int pageNumber) {
+        if (pageNumber < 0) {
+            throw new ExpenseQueryException("ページ番号が不正です");
+        }
+        CurrentUser currentUser = currentUserService.require(username);
+        requireApprover(currentUser);
+        PageRequest pageRequest = PageRequest.of(pageNumber, PAGE_SIZE,
+                Sort.by(Sort.Order.asc("submittedAt"), Sort.Order.asc("id")));
+        Page<ExpenseRequest> requests = expenseRequestRepository.findApprovalPage(
+                currentUser.departmentId(), currentUser.id(), ExpenseStatus.SUBMITTED, pageRequest);
+        List<ApprovalListItem> items = requests.getContent().stream()
+                .map(this::toApprovalListItem)
+                .toList();
+        return new ApprovalListPage(items, requests.getTotalElements(), requests.getTotalPages(),
+                requests.getNumber(), requests.hasPrevious(), requests.hasNext());
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isApprover(String username) {
+        return currentUserService.require(username).isApprover();
+    }
+
+    @Transactional(readOnly = true)
+    public void authorizeApprovalTarget(String username, Long id) {
+        CurrentUser currentUser = currentUserService.require(username);
+        requireApprover(currentUser);
+        requireApprovalTarget(id, currentUser);
     }
 
     @Transactional(readOnly = true)
@@ -173,6 +206,40 @@ public class ExpenseService {
                 ExpenseStatus.SUBMITTED, null, now));
     }
 
+    @Transactional
+    public void approve(String username, Long id, ApprovalForm form) {
+        CurrentUser currentUser = currentUserService.require(username);
+        ExpenseRequest request = requireApprovalTarget(id, currentUser);
+        requireMatchingVersion(form == null ? null : form.getVersion(), request);
+        if (request.getStatus() != ExpenseStatus.SUBMITTED) {
+            throw new ExpenseConflictException();
+        }
+        String comment = parseApprovalComment(form, false);
+        Instant now = clock.instant();
+        ExpenseStatus previousStatus = request.approve(now);
+        expenseRequestRepository.saveAndFlush(request);
+        expenseEventRepository.saveAndFlush(ExpenseEvent.record(
+                request, currentUser.user(), ExpenseEventAction.APPROVE, previousStatus,
+                ExpenseStatus.APPROVED, comment, now));
+    }
+
+    @Transactional
+    public void returnToApplicant(String username, Long id, ApprovalForm form) {
+        CurrentUser currentUser = currentUserService.require(username);
+        ExpenseRequest request = requireApprovalTarget(id, currentUser);
+        requireMatchingVersion(form == null ? null : form.getVersion(), request);
+        if (request.getStatus() != ExpenseStatus.SUBMITTED) {
+            throw new ExpenseConflictException();
+        }
+        String comment = parseApprovalComment(form, true);
+        Instant now = clock.instant();
+        ExpenseStatus previousStatus = request.returnForRevision(now);
+        expenseRequestRepository.saveAndFlush(request);
+        expenseEventRepository.saveAndFlush(ExpenseEvent.record(
+                request, currentUser.user(), ExpenseEventAction.RETURN, previousStatus,
+                ExpenseStatus.RETURNED, comment, now));
+    }
+
     private ExpenseRequest requireVisible(Long id, CurrentUser currentUser) {
         ExpenseRequest request = requireExisting(id);
         boolean owner = Objects.equals(request.getApplicant().getId(), currentUser.id());
@@ -191,6 +258,23 @@ public class ExpenseService {
             throw new ExpenseNotFoundException();
         }
         return request;
+    }
+
+    private ExpenseRequest requireApprovalTarget(Long id, CurrentUser currentUser) {
+        requireApprover(currentUser);
+        ExpenseRequest request = requireExisting(id);
+        boolean sameDepartment = Objects.equals(request.getDepartment().getId(), currentUser.departmentId());
+        boolean ownRequest = Objects.equals(request.getApplicant().getId(), currentUser.id());
+        if (!sameDepartment || ownRequest || request.getStatus() == ExpenseStatus.DRAFT) {
+            throw new ExpenseNotFoundException();
+        }
+        return request;
+    }
+
+    private void requireApprover(CurrentUser currentUser) {
+        if (!currentUser.isApprover()) {
+            throw new ExpenseForbiddenException();
+        }
     }
 
     private ExpenseRequest requireExisting(Long id) {
@@ -363,8 +447,24 @@ public class ExpenseService {
                 formatInstant(request.getUpdatedAt()));
     }
 
+    private ApprovalListItem toApprovalListItem(ExpenseRequest request) {
+        return new ApprovalListItem(
+                request.getId(),
+                request.getApplicant().getDisplayName(),
+                request.getApplicant().getUsername(),
+                request.getTitle(),
+                CATEGORY_LABELS.get(request.getCategory()),
+                request.getExpenseDate().toString(),
+                request.getAmount().toPlainString(),
+                formatInstant(request.getSubmittedAt()),
+                request.getVersion());
+    }
+
     private ExpenseDetailView toDetailView(ExpenseRequest request, CurrentUser currentUser) {
         boolean owner = Objects.equals(request.getApplicant().getId(), currentUser.id());
+        boolean sameDepartment = Objects.equals(request.getDepartment().getId(), currentUser.departmentId());
+        boolean canApprove = currentUser.isApprover() && !owner && sameDepartment
+                && request.getStatus() == ExpenseStatus.SUBMITTED;
         List<ExpenseEventView> events = expenseEventRepository
                 .findByExpenseIdForDisplay(request.getId()).stream()
                 .map(this::toEventView)
@@ -388,7 +488,8 @@ public class ExpenseService {
                 events,
                 owner && request.isEditable(),
                 owner && request.isDeletable(),
-                owner && request.isSubmittable());
+                owner && request.isSubmittable(),
+                canApprove);
     }
 
     private ExpenseEventView toEventView(ExpenseEvent event) {
@@ -425,6 +526,23 @@ public class ExpenseService {
         return value.replace("\\", "\\\\")
                 .replace("%", "\\%")
                 .replace("_", "\\_");
+    }
+
+    private String parseApprovalComment(ApprovalForm form, boolean required) {
+        ApprovalForm actualForm = form == null ? new ApprovalForm() : form;
+        String comment = trimToEmpty(actualForm.getComment());
+        Map<String, String> errors = new LinkedHashMap<>();
+        if (required && comment.isEmpty()) {
+            errors.put("comment", "差戻し理由は1〜500文字で入力してください");
+        } else if (comment.length() > 500) {
+            errors.put("comment", required
+                    ? "差戻し理由は1〜500文字で入力してください"
+                    : "承認コメントは500文字以内で入力してください");
+        }
+        if (!errors.isEmpty()) {
+            throw new ApprovalInputException(actualForm, errors);
+        }
+        return comment.isEmpty() ? null : comment;
     }
 
     public static Map<ExpenseStatus, String> statusLabels() {

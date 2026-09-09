@@ -126,6 +126,28 @@ public class ExpenseRequest {
         return previous;
     }
 
+    public ExpenseStatus approve(Instant now) {
+        ensureStatus(ExpenseStatus.SUBMITTED);
+        if (now == null) {
+            throw new IllegalArgumentException("承認日時は必須です");
+        }
+        ExpenseStatus previous = status;
+        status = ExpenseStatus.APPROVED;
+        updatedAt = now;
+        return previous;
+    }
+
+    public ExpenseStatus returnForRevision(Instant now) {
+        ensureStatus(ExpenseStatus.SUBMITTED);
+        if (now == null) {
+            throw new IllegalArgumentException("差戻し日時は必須です");
+        }
+        ExpenseStatus previous = status;
+        status = ExpenseStatus.RETURNED;
+        updatedAt = now;
+        return previous;
+    }
+
     public boolean isEditable() {
         return status == ExpenseStatus.DRAFT || status == ExpenseStatus.RETURNED;
     }
