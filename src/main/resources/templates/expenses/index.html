@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>申請一覧 | ExpenseFlow</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<div th:replace="~{fragments/header :: header}"></div>
+<main class="page-shell" aria-labelledby="page-title">
+    <p class="eyebrow">ExpenseFlow</p>
+    <h1 id="page-title">経費申請</h1>
+    <section class="notice-panel" aria-labelledby="phase-title">
+        <h2 id="phase-title">フェーズ1：ログイン基盤</h2>
+        <p>ログインとDB基盤が利用できます。申請一覧・作成・承認フローは後続フェーズで実装します。</p>
+    </section>
+</main>
+</body>
+</html>
