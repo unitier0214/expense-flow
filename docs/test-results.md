@@ -36,6 +36,12 @@ GitHub Actions [run 34358530765](https://github.com/unitier0214/expense-flow/act
 - [run 34357994227](https://github.com/unitier0214/expense-flow/actions/runs/34357994227)：失敗。任意検索条件のnullパラメータ型推論が残っていたため、検索クエリを修正。
 - [run 34358530765](https://github.com/unitier0214/expense-flow/actions/runs/34358530765)：成功。上記修正後の最終検証。
 
+## フェーズ2レビュー修正（2026-09-09）
+
+検証対象コミットは [`ff441f7a`](https://github.com/unitier0214/expense-flow/commit/ff441f7a3fa39782ddbbc54719f72b6bf7f5b4d5)。[GitHub Actions run 34394247514](https://github.com/unitier0214/expense-flow/actions/runs/34394247514) で、`./mvnw --batch-mode test`が32テスト、失敗0・エラー0・スキップ0で成功した。編集エラー後の元ID復帰、version型不正の表示、独立トランザクションの同期・楽観ロック競合検証を含む。
+
+`./mvnw --batch-mode verify`、`docker compose config --quiet`、Compose smokeも同じrunで成功した。前回の`4077b2bd`の結果は流用していない。
+
 ### ローカルで未実行の項目
 
 - ローカルの`./mvnw test`／`./mvnw verify`：標準Javaは17.0.20で、Java 21を明示したcompile試行も`repo.maven.apache.org`の名前解決失敗により依存取得前に終了したため未完了。

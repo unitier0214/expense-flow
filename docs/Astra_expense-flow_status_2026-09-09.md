@@ -6,8 +6,8 @@
 ## 結論
 
 - フェーズ1「基盤とログイン」は完了済み。
-- フェーズ2「社員の申請機能」まで実装・検証済み。承認・差戻しの実操作とCSVは未着手。
-- フェーズ2の検証対象コミットは [`ebe33218`](https://github.com/unitier0214/expense-flow/commit/ebe33218eef7000932f450de8103db9e0a746ef2)、CIは [run 34358530765](https://github.com/unitier0214/expense-flow/actions/runs/34358530765)。
+- フェーズ2「社員の申請機能」まで実装・レビュー修正・検証済み。承認・差戻しの実操作とCSVは未着手。
+- フェーズ2レビュー修正の検証対象コミットは [`ff441f7a`](https://github.com/unitier0214/expense-flow/commit/ff441f7a3fa39782ddbbc54719f72b6bf7f5b4d5)、CIは [run 34394247514](https://github.com/unitier0214/expense-flow/actions/runs/34394247514)。
 - Java 21、Spring Boot 4.1.1、PostgreSQL 17.11、Testcontainers、Docker Composeで`test`、`verify`、Compose smokeが成功した。
 
 ## 最初に読むファイル
@@ -39,6 +39,7 @@
 - 金額はtrim後の`[0-9]+`だけをBigDecimalへ変換し、1〜1,000,000の整数をサービス・ドメインで検証。小数・指数・カンマ・非数値を受け入れない。
 - Clockで操作時刻とJST当日判定を統一し、Instantで保存してAsia/Tokyoで表示。`open-in-view=false`を維持。
 - 経費変更POSTの成功は303。Spring Securityのログイン・ログアウト302は変更していない。
+- 編集エラー後もURLの@PathVariableに基づく元申請のaction・キャンセル先を維持し、version型不正を400で項目表示する。idパラメータは信用しない。
 
 ## ロールとデモ認証情報の整理
 
@@ -50,7 +51,7 @@
 
 | 検証 | 結果 |
 |---|---|
-| `./mvnw --batch-mode test` | 成功。31テスト、失敗0、エラー0、スキップ0 |
+| `./mvnw --batch-mode test` | 成功。32テスト、失敗0、エラー0、スキップ0 |
 | `./mvnw --batch-mode verify` | 成功 |
 | `docker compose config --quiet` | 成功 |
 | Testcontainers PostgreSQL 17.11 | Flyway、認証、申請CRUD、履歴、検索、権限、CSRF、version競合、ロールバックを確認 |

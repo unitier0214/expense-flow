@@ -2,6 +2,13 @@
 
 ## フェーズ2：社員の申請機能
 
+### フェーズ2レビュー修正（2026-09-09）
+
+- 編集入力エラー時のフォームactionとキャンセル先をURLの@PathVariable idから固定し、送信されたidを信用しないよう修正。version型不正の日本語エラー表示も追加した。
+- 編集エラー→元申請への再送信、id欠落・別ID改変、version型不正、申請件数とUPDATE履歴の維持を回帰テストへ追加した。
+- 同時更新テストを独立したPostgreSQLトランザクション＋version読み取り同期＋タイムアウトへ変更し、成功1件と楽観ロック競合1件を例外型・原因まで確認した。
+- 修正対象コミットは [`ff441f7a`](https://github.com/unitier0214/expense-flow/commit/ff441f7a3fa39782ddbbc54719f72b6bf7f5b4d5)、専用CIは [run 34394247514](https://github.com/unitier0214/expense-flow/actions/runs/34394247514)。32テスト、失敗0・エラー0・スキップ0で成功した。
+
 ### 実装内容
 
 - `/expenses` を本人の申請一覧へ置き換え、状態・分類・利用日範囲・件名検索、20件ページングを実装。

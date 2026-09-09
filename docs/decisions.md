@@ -44,3 +44,9 @@
 - 経費変更とCREATE／UPDATE／SUBMIT履歴は同一`@Transactional`で保存する。正常な経費POSTは303、Spring Securityのログイン・ログアウトリダイレクトは既存どおり302とする。
 - ユーザーロールは設計書どおりEMPLOYEEとAPPROVERの2種類だけとする。既存の現状報告にあった「管理者」は誤記として訂正し、管理者ロールは追加しない。
 - READMEに記載するdemoのusername/passwordは、demoプロファイル専用の架空fixtureであり、公開してよい検証用固定値として扱う。実運用の秘密情報や`.env`はコミットしない。
+
+## 2026-09-09：フェーズ2レビュー修正
+
+- 編集POSTの対象は常に`@PathVariable id`とし、入力エラー・version型変換エラーの再表示でも`/expenses/{id}/edit`と元申請へのキャンセル先をサーバー側で組み立てる。フォームから送信された`id`は更新対象と再表示先の決定に使わない。
+- version型変換エラーはhidden項目だけで終わらせず、編集画面に項目別の日本語エラーを表示する。Serviceの認可とversion検証は従来どおり維持する。
+- 同時更新テストは`TransactionTemplate`で独立したPostgreSQLトランザクションを作り、両者がversion 0を読み終えた後に更新する`CyclicBarrier`を置く。Futureとbarrierにタイムアウトを設け、成功1件・楽観ロック例外を含む失敗1件、勝者の内容・version・履歴を確認する。サービスの事前version比較は別のHTTPテストで検証し、DBの`@Version`検知と混同しない。

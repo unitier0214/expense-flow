@@ -4,12 +4,12 @@
 
 レビュー開始点：`c1b04d16d7d399e246a30f647200afaf9f584d67`
 
-実装検証対象：`ebe33218eef7000932f450de8103db9e0a746ef2`
-検証CI：[GitHub Actions run 34358530765](https://github.com/unitier0214/expense-flow/actions/runs/34358530765)
+実装検証対象：`ff441f7a3fa39782ddbbc54719f72b6bf7f5b4d5`
+検証CI：[GitHub Actions run 34394247514](https://github.com/unitier0214/expense-flow/actions/runs/34394247514)
 
 ## 判定
 
-フェーズ2「社員の申請機能」は完了。Java 21、Spring Boot 4.1.1、PostgreSQL 17.11、Testcontainers、CSRF、`spring.jpa.open-in-view=false`を維持した。承認・差戻しの実操作、承認待ち一覧、CSV出力はフェーズ3以降へ残した。
+フェーズ2「社員の申請機能」とレビュー指摘修正は完了。Java 21、Spring Boot 4.1.1、PostgreSQL 17.11、Testcontainers、CSRF、`spring.jpa.open-in-view=false`を維持した。承認・差戻しの実操作、承認待ち一覧、CSV出力は後続へ残した。
 
 ## 実装した範囲
 
@@ -34,11 +34,12 @@ Controller / Form DTO / Service / Repository / Entityを分離し、認証userna
 - CREATE／UPDATE／SUBMIT履歴と経費変更は同一トランザクション。履歴保存障害時に双方ロールバックする。
 - 金額はtrim後の半角数字列`[0-9]+`だけをBigDecimalへ変換し、1〜1,000,000の整数をサービス・ドメイン双方で検証。小数表記、指数表記、カンマ、非数値を拒否し、入力エラーでは元文字列を保持する。
 - 利用日の当日判定はAsia/Tokyo、保存日時はInstant、画面表示はJST。経費変更成功は303、Securityのログイン・ログアウトは302。
+- 編集エラー時のform actionとキャンセル先はURLの@PathVariable idで固定し、フォームのidを信用しない。version型不正は画面に理由を表示する。
 - 入力400、権限外／不存在404、競合409、予期せぬ500（照合ID付き汎用画面）を実装。画面はThymeleafのテキスト出力でHTMLエスケープする。
 
 ## テストとCI
 
-- `./mvnw --batch-mode test`：成功、31テスト、失敗0、エラー0、スキップ0。
+- `./mvnw --batch-mode test`：成功、32テスト、失敗0、エラー0、スキップ0。
   - ExpenseIntegrationTest 18
   - SecurityIntegrationTest 12
   - DemoDataInitializerIntegrationTest 1
@@ -47,7 +48,7 @@ Controller / Form DTO / Service / Repository / Entityを分離し、認証userna
 - Compose smoke：DB readiness、アプリhealthcheck、demoログイン、一覧、新規作成、編集、申請、詳細／履歴、CSRF付きPOSTログアウト、ログアウト後の保護URL再認証、DB永続化を確認。
 - PostgreSQL 17.11でFlyway V1を新規適用。現行V1で足りるためV1変更・V2追加は行っていない。
 - RETURNED／APPROVEDはテストfixtureで用意し、実アプリに状態変更の裏口を追加していない。
-- 既存のフェーズ1基準CIを流用せず、今回のコードを含むrun 34358530765を新規実行した。
+- 既存のフェーズ1・前回フェーズ2CIを流用せず、今回の修正を含むrun 34394247514を新規実行した。
 
 ## ロールとデモ認証情報の訂正
 
