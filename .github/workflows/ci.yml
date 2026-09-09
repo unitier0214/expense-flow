@@ -76,7 +76,9 @@ jobs:
           echo "login HTTP status: $login_status"
           test "$login_status" = "302"
           grep -qiE '^location: (http://localhost:8080)?/expenses' "$login_headers"
-          curl --fail --silent --cookie "$cookies" --output "$expenses_page" http://localhost:8080/expenses
+          expenses_status=$(curl --silent --show-error --cookie "$cookies" --output "$expenses_page" --write-out '%{http_code}' http://localhost:8080/expenses)
+          echo "expenses HTTP status: $expenses_status"
+          test "$expenses_status" = "200"
           grep -q 'フェーズ1：ログイン基盤' "$expenses_page"
           logout_csrf=$(extract_csrf "$expenses_page")
           test -n "$logout_csrf"
