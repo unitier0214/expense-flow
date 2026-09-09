@@ -45,9 +45,31 @@ jobs:
           expenses_page=$(mktemp)
           login_headers=$(mktemp)
           logout_headers=$(mktemp)
+          extract_csrf() {
+            python3 - "$1" <<'PY'
+          import sys
+          from html.parser import HTMLParser
+
+          class CsrfParser(HTMLParser):
+              token = None
+
+              def handle_starttag(self, tag, attrs):
+                  attributes = dict(attrs)
+                  if tag == "input" and attributes.get("name") == "_csrf":
+                      self.token = attributes.get("value")
+
+          parser = CsrfParser()
+          with open(sys.argv[1], encoding="utf-8") as page:
+              parser.feed(page.read())
+          if not parser.token:
+              raise SystemExit("CSRF input not found")
+          print(parser.token)
+          PY
+          }
           curl --fail --silent --cookie-jar "$cookies" --output "$login_page" http://localhost:8080/login
           grep -q '経費申請・承認システム' "$login_page"
-          csrf=$(sed -n 's/.*name="_csrf" value="\([^"]*\)".*/\1/p' "$login_page")
+          grep -q 'JSESSIONID' "$cookies"
+          csrf=$(extract_csrf "$login_page")
           test -n "$csrf"
 
           login_status=$(curl --silent --show-error --cookie "$cookies" --cookie-jar "$cookies" --dump-header "$login_headers" --output /dev/null --write-out '%{http_code}' --data-urlencode "username=demo.employee" --data-urlencode "password=demo-password" --data-urlencode "_csrf=$csrf" http://localhost:8080/login)
@@ -56,7 +78,7 @@ jobs:
           grep -qiE '^location: (http://localhost:8080)?/expenses' "$login_headers"
           curl --fail --silent --cookie "$cookies" --output "$expenses_page" http://localhost:8080/expenses
           grep -q 'フェーズ1：ログイン基盤' "$expenses_page"
-          logout_csrf=$(sed -n 's/.*name="_csrf" value="\([^"]*\)".*/\1/p' "$expenses_page")
+          logout_csrf=$(extract_csrf "$expenses_page")
           test -n "$logout_csrf"
 
           logout_status=$(curl --silent --show-error --cookie "$cookies" --cookie-jar "$cookies" --dump-header "$logout_headers" --output /dev/null --write-out '%{http_code}' --data-urlencode "_csrf=$logout_csrf" http://localhost:8080/logout)
