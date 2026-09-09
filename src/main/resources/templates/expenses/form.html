@@ -62,7 +62,8 @@
                th:text="${fieldErrors['amount']}" role="alert">金額エラー</p>
         </div>
         <div class="form-actions">
-            <a class="button button-secondary" th:href="${isEdit ? '/expenses/' + form.id : '/expenses'}">キャンセル</a>
+            <a class="button button-secondary"
+               th:href="${isEdit ? '/expenses/' + editTargetId : '/expenses'}">キャンセル</a>
             <button class="button button-primary" type="submit" th:text="${submitLabel}">下書きを保存</button>
         </div>
     </form>

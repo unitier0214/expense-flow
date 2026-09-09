@@ -53,7 +53,7 @@ public class ExpenseController {
 
     @GetMapping("/expenses/new")
     public ModelAndView newExpense(Authentication authentication) {
-        ModelAndView model = formModel(new ExpenseForm(), false, authentication.getName());
+        ModelAndView model = formModel(new ExpenseForm(), false, null, authentication.getName());
         model.addObject("pageTitle", "経費申請を作成");
         model.addObject("submitLabel", "下書きを保存");
         return model;
@@ -64,13 +64,13 @@ public class ExpenseController {
                                @ModelAttribute("form") ExpenseForm form,
                                BindingResult bindingResult) {
         if (bindingResult.hasErrors()) {
-            return formError(form, false, authentication.getName(), bindingErrors(bindingResult));
+            return formError(form, false, null, authentication.getName(), bindingErrors(bindingResult));
         }
         try {
             Long id = expenseService.create(authentication.getName(), form);
             return seeOther("/expenses/" + id);
         } catch (ExpenseInputException exception) {
-            return formError(exception.getForm(), false, authentication.getName(),
+            return formError(exception.getForm(), false, null, authentication.getName(),
                     exception.getFieldErrors());
         }
     }
@@ -87,7 +87,7 @@ public class ExpenseController {
     @GetMapping("/expenses/{id}/edit")
     public ModelAndView edit(Authentication authentication, @PathVariable Long id) {
         ExpenseForm form = expenseService.prepareEdit(authentication.getName(), id);
-        ModelAndView model = formModel(form, true, authentication.getName());
+        ModelAndView model = formModel(form, true, id, authentication.getName());
         model.addObject("pageTitle", "経費申請を編集");
         model.addObject("submitLabel", "変更を保存");
         return model;
@@ -98,13 +98,13 @@ public class ExpenseController {
                                @ModelAttribute("form") ExpenseForm form,
                                BindingResult bindingResult) {
         if (bindingResult.hasErrors()) {
-            return formError(form, true, authentication.getName(), bindingErrors(bindingResult));
+            return formError(form, true, id, authentication.getName(), bindingErrors(bindingResult));
         }
         try {
             expenseService.update(authentication.getName(), id, form);
             return seeOther("/expenses/" + id);
         } catch (ExpenseInputException exception) {
-            return formError(exception.getForm(), true, authentication.getName(),
+            return formError(exception.getForm(), true, id, authentication.getName(),
                     exception.getFieldErrors());
         }
     }
@@ -123,21 +123,24 @@ public class ExpenseController {
         return seeOther("/expenses/" + id);
     }
 
-    private ModelAndView formModel(ExpenseForm form, boolean edit, String username) {
+    private ModelAndView formModel(ExpenseForm form, boolean edit, Long editTargetId,
+                                   String username) {
         ModelAndView model = new ModelAndView("expenses/form");
         model.addObject("currentUsername", username);
         model.addObject("form", form);
         model.addObject("isEdit", edit);
+        model.addObject("editTargetId", editTargetId);
         model.addObject("categories", ExpenseService.categoryLabels());
-        model.addObject("formAction", edit && form.getId() != null
-                ? "/expenses/" + form.getId() + "/edit" : "/expenses");
+        model.addObject("formAction", edit && editTargetId != null
+                ? "/expenses/" + editTargetId + "/edit" : "/expenses");
         model.addObject("fieldErrors", Map.of());
         return model;
     }
 
-    private ModelAndView formError(ExpenseForm form, boolean edit, String username,
+    private ModelAndView formError(ExpenseForm form, boolean edit, Long editTargetId,
+                                   String username,
                                    Map<String, String> fieldErrors) {
-        ModelAndView model = formModel(form, edit, username);
+        ModelAndView model = formModel(form, edit, editTargetId, username);
         model.setStatus(HttpStatus.BAD_REQUEST);
         model.addObject("pageTitle", edit ? "経費申請を編集" : "経費申請を作成");
         model.addObject("submitLabel", edit ? "変更を保存" : "下書きを保存");

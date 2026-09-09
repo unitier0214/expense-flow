@@ -15,10 +15,11 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import jp.example.expenseflow.feature.auth.domain.AppUser;
 import jp.example.expenseflow.feature.auth.domain.Department;
 import jp.example.expenseflow.feature.auth.domain.UserRole;
@@ -44,6 +45,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -96,6 +99,9 @@ class ExpenseIntegrationTest {
 
     @Autowired
     JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    PlatformTransactionManager transactionManager;
 
     private Department sales;
     private Department development;
@@ -201,6 +207,66 @@ class ExpenseIntegrationTest {
 
         assertThat(expenseRequestRepository.count()).isZero();
         assertThat(expenseEventRepository.count()).isZero();
+    }
+
+    @Test
+    void editValidationKeepsPathIdAndAllowsRecoveryOnTheOriginalRequest() throws Exception {
+        MockHttpSession session = loginAs(employee.getUsername());
+        Long id = createViaHttp(session, "編集復帰前", "用途", "OTHER", "2026-09-08", "100");
+        Long otherId = createViaHttp(session, "別申請", "別用途", "OTHER", "2026-09-08", "200");
+
+        mockMvc.perform(post("/expenses/{id}/edit", id)
+                        .session(session)
+                        .with(csrf())
+                        .param("title", "編集復帰前")
+                        .param("purpose", "用途")
+                        .param("category", "OTHER")
+                        .param("expenseDate", "2026-09-08")
+                        .param("amount", "1.5")
+                        .param("version", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "action=\"/expenses/" + id + "/edit\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "href=\"/expenses/" + id + "\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("1.5")));
+
+        mockMvc.perform(post("/expenses/{id}/edit", id)
+                        .session(session)
+                        .with(csrf())
+                        .param("id", otherId.toString())
+                        .param("title", "編集復帰前")
+                        .param("purpose", "用途")
+                        .param("category", "OTHER")
+                        .param("expenseDate", "2026-09-08")
+                        .param("amount", "not-a-number")
+                        .param("version", "not-a-number"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "versionの形式が不正です")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "action=\"/expenses/" + id + "/edit\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "href=\"/expenses/" + id + "\"")));
+
+        mockMvc.perform(post("/expenses/{id}/edit", id)
+                        .session(session)
+                        .with(csrf())
+                        .param("id", otherId.toString())
+                        .param("title", "編集復帰後")
+                        .param("purpose", "用途")
+                        .param("category", "OTHER")
+                        .param("expenseDate", "2026-09-08")
+                        .param("amount", "300")
+                        .param("version", "0"))
+                .andExpect(status().isSeeOther())
+                .andExpect(redirectedUrl("/expenses/" + id));
+
+        assertThat(expenseRequestRepository.count()).isEqualTo(2);
+        assertThat(findRequest(id).getTitle()).isEqualTo("編集復帰後");
+        assertThat(findRequest(otherId).getTitle()).isEqualTo("別申請");
+        assertThat(expenseEventRepository.findByExpenseIdForDisplay(id)).hasSize(2);
+        assertThat(expenseEventRepository.findByExpenseIdForDisplay(otherId)).hasSize(1);
     }
 
     @Test
@@ -580,37 +646,41 @@ class ExpenseIntegrationTest {
     void concurrentUpdatesAllowOneCommitAndOneConflict() throws Exception {
         MockHttpSession session = loginAs(employee.getUsername());
         Long id = createViaHttp(session, "同時更新", "用途", "OTHER", "2026-09-08", "100");
-        ExpenseRequest initial = findRequest(id);
-        ExpenseForm first = ExpenseForm.from(initial);
-        first.setTitle("同時更新A");
-        ExpenseForm second = ExpenseForm.from(initial);
-        second.setTitle("同時更新B");
+        CyclicBarrier bothReadVersionZero = new CyclicBarrier(2);
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
-            List<Future<Boolean>> futures = executor.invokeAll(List.of(
-                    () -> updateFromThread(id, first),
-                    () -> updateFromThread(id, second)));
-            int successCount = 0;
-            int failureCount = 0;
-            for (Future<Boolean> future : futures) {
-                try {
-                    if (future.get()) {
-                        successCount++;
-                    }
-                } catch (ExecutionException exception) {
-                    failureCount++;
-                }
-            }
-            assertThat(successCount).isEqualTo(1);
-            assertThat(failureCount).isEqualTo(1);
+            List<Future<ConcurrentUpdateOutcome>> futures = List.of(
+                    executor.submit(() -> updateInIndependentTransaction(
+                            id, "同時更新A", bothReadVersionZero, transactionTemplate)),
+                    executor.submit(() -> updateInIndependentTransaction(
+                            id, "同時更新B", bothReadVersionZero, transactionTemplate)));
+            List<ConcurrentUpdateOutcome> outcomes = futures.stream()
+                    .map(future -> getWithTimeout(future, "同時更新がタイムアウトしました"))
+                    .toList();
+
+            List<ConcurrentUpdateOutcome> successes = outcomes.stream()
+                    .filter(ConcurrentUpdateOutcome::succeeded)
+                    .toList();
+            List<ConcurrentUpdateOutcome> failures = outcomes.stream()
+                    .filter(outcome -> !outcome.succeeded())
+                    .toList();
+            assertThat(successes).hasSize(1);
+            assertThat(failures).hasSize(1);
+            assertThat(hasOptimisticLockCause(failures.get(0).failure()))
+                    .as("失敗は楽観ロック競合でなければならない: " + failures.get(0).failure())
+                    .isTrue();
+
+            ExpenseRequest current = findRequest(id);
+            assertThat(current.getVersion()).isEqualTo(1L);
+            assertThat(current.getTitle()).isEqualTo(successes.get(0).title());
+            List<ExpenseEvent> events = expenseEventRepository.findByExpenseIdForDisplay(id);
+            assertThat(events).hasSize(2);
+            assertThat(events.get(1).getAction()).isEqualTo(ExpenseEventAction.UPDATE);
         } finally {
             executor.shutdownNow();
         }
-
-        ExpenseRequest current = findRequest(id);
-        assertThat(current.getVersion()).isEqualTo(1L);
-        assertThat(expenseEventRepository.findByExpenseIdForDisplay(id)).hasSize(2);
     }
 
     @Test
@@ -659,9 +729,70 @@ class ExpenseIntegrationTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("&lt;b&gt;用途&lt;/b&gt;")));
     }
 
-    private boolean updateFromThread(Long id, ExpenseForm form) {
-        expenseService.update(employee.getUsername(), id, form);
-        return true;
+    private ConcurrentUpdateOutcome updateInIndependentTransaction(
+            Long id, String title, CyclicBarrier barrier, TransactionTemplate transactionTemplate) {
+        try {
+            String savedTitle = transactionTemplate.execute(status -> {
+                ExpenseRequest request = findRequest(id);
+                assertThat(request.getVersion()).isZero();
+                awaitBarrier(barrier);
+                request.updateDetails(title, "用途", ExpenseCategory.OTHER,
+                        LocalDate.of(2026, 9, 8), new java.math.BigDecimal("100"),
+                        FIXED_INSTANT, LocalDate.of(2026, 9, 9));
+                expenseRequestRepository.saveAndFlush(request);
+                expenseEventRepository.saveAndFlush(ExpenseEvent.record(request, employee,
+                        ExpenseEventAction.UPDATE, ExpenseStatus.DRAFT, ExpenseStatus.DRAFT,
+                        null, FIXED_INSTANT));
+                return request.getTitle();
+            });
+            return ConcurrentUpdateOutcome.success(savedTitle);
+        } catch (Throwable failure) {
+            return ConcurrentUpdateOutcome.failure(failure);
+        }
+    }
+
+    private void awaitBarrier(CyclicBarrier barrier) {
+        try {
+            barrier.await(10, TimeUnit.SECONDS);
+        } catch (Exception exception) {
+            throw new IllegalStateException("同時更新テストの同期に失敗しました", exception);
+        }
+    }
+
+    private ConcurrentUpdateOutcome getWithTimeout(Future<ConcurrentUpdateOutcome> future,
+                                                   String message) {
+        try {
+            return future.get(20, TimeUnit.SECONDS);
+        } catch (Exception exception) {
+            throw new AssertionError(message, exception);
+        }
+    }
+
+    private boolean hasOptimisticLockCause(Throwable failure) {
+        Throwable current = failure;
+        while (current != null) {
+            if (current instanceof org.springframework.dao.OptimisticLockingFailureException
+                    || current instanceof jakarta.persistence.OptimisticLockException) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private record ConcurrentUpdateOutcome(String title, Throwable failure) {
+
+        static ConcurrentUpdateOutcome success(String title) {
+            return new ConcurrentUpdateOutcome(title, null);
+        }
+
+        static ConcurrentUpdateOutcome failure(Throwable failure) {
+            return new ConcurrentUpdateOutcome(null, failure);
+        }
+
+        boolean succeeded() {
+            return failure == null;
+        }
     }
 
     private AppUser saveUser(String username, String displayName, Department department,
