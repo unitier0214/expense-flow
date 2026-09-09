@@ -15,6 +15,7 @@ jobs:
           java-version: '21'
           cache: maven
       - run: chmod +x mvnw
+      - run: ./mvnw --batch-mode test
       - run: ./mvnw --batch-mode verify
       - name: Validate Docker Compose configuration
         env:
