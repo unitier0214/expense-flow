@@ -305,6 +305,7 @@ class CsvIntegrationTest {
     static class FixedClockConfiguration {
 
         @Bean
+        @org.springframework.context.annotation.Primary
         Clock fixedClock() {
             return Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC);
         }
