@@ -13,6 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -45,6 +46,7 @@ class DemoDataInitializerIntegrationTest {
     PasswordEncoder passwordEncoder;
 
     @Test
+    @Transactional
     void demoDataIsCreatedIdempotently() throws Exception {
         assertThat(departmentRepository.count()).isEqualTo(2);
         assertThat(appUserRepository.count()).isEqualTo(5);
