@@ -357,21 +357,45 @@ jobs:
           java-version: '21'
           cache: maven
       - run: chmod +x mvnw
-      - name: Run OWASP Dependency-Check
-        run: >-
-          ./mvnw --batch-mode
-          org.owasp:dependency-check-maven:13.0.0:check
-          -DskipTests
-          -Dformats=HTML,JSON
-          -DfailBuildOnCVSS=11
-          -DfailOnError=true
-          -DossIndexAnalyzerEnabled=false
-      - name: Upload dependency scan reports
+      - name: Resolve Maven dependencies for scanning
+        run: ./mvnw --batch-mode -DskipTests package
+      - name: Run Trivy dependency vulnerability scan
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/src" \
+            -w /src \
+            aquasec/trivy:0.58.2 \
+            fs --scanners vuln --format json --output trivy-report.json \
+            --exit-code 0 --no-progress --skip-dirs .git .
+          test -s trivy-report.json
+          python3 - trivy-report.json <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as report_file:
+              report = json.load(report_file)
+          vulnerabilities = []
+          for result in report.get("Results", []):
+              for vulnerability in result.get("Vulnerabilities") or []:
+                  vulnerabilities.append(vulnerability)
+          print(f"Trivy vulnerabilities detected: {len(vulnerabilities)}")
+          counts = {}
+          for vulnerability in vulnerabilities:
+              severity = vulnerability.get("Severity", "UNKNOWN")
+              counts[severity] = counts.get(severity, 0) + 1
+          print("Severity counts:", counts)
+          for vulnerability in vulnerabilities:
+              print(
+                  vulnerability.get("VulnerabilityID"),
+                  vulnerability.get("PkgName"),
+                  vulnerability.get("InstalledVersion"),
+                  vulnerability.get("Severity"),
+              )
+          PY
+      - name: Upload dependency scan report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: expenseflow-dependency-check-report
-          path: |
-            target/dependency-check-report.html
-            target/dependency-check-report.json
+          name: expenseflow-trivy-report
+          path: trivy-report.json
           if-no-files-found: warn
