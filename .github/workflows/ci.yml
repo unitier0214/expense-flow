@@ -443,7 +443,6 @@ jobs:
           test -s trivy-report.json
           python3 - trivy-report.json target/runtime-dependency-inventory.json <<'PY'
           import json
-          import pathlib
           import sys
 
           with open(sys.argv[1], encoding="utf-8") as report_file:
@@ -457,8 +456,10 @@ jobs:
           results = report.get("Results") or []
           if not results:
               raise SystemExit("Trivy returned no analysis target")
-          if not any(result.get("Type") == "cyclonedx" for result in results):
-              raise SystemExit("Trivy did not analyze a CycloneDX SBOM target")
+          if report.get("ArtifactType") != "cyclonedx":
+              raise SystemExit("Trivy did not analyze the CycloneDX SBOM artifact")
+          if not any(result.get("Type") == "jar" for result in results):
+              raise SystemExit("Trivy did not analyze the Java runtime dependency target")
           print("Trivy artifact:", report.get("ArtifactName"))
           print("Trivy artifact type:", report.get("ArtifactType"))
           for result in results:
