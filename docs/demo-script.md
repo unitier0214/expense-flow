@@ -6,7 +6,7 @@
 
 1. `.env.example`を`.env`へコピーし、`POSTGRES_PASSWORD`を設定する。
 2. `SPRING_PROFILES_ACTIVE=demo docker compose up --build`を実行する。
-3. `/login`を開く。demo初回起動では営業部・開発部、5ユーザー、状態を分散した申請45件と履歴が冪等投入される。
+3. `/login`を開く。demo初回起動では営業部・開発部、5ユーザー、状態を分散した申請45件と履歴が冪等投入される。投入済み判定はV2の`expense-01`〜`expense-45` markerで行うため、件名変更や下書き削除後の再起動でも申請を復活させない。
 
 ## 3分デモ
 

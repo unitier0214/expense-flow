@@ -22,6 +22,8 @@ Java / Spring Bootで作る、架空企業向けの経費申請・承認シス�
 
 CSVは本人の検索条件を引き継ぎ、`updated_at DESC, id DESC`で全該当行を出力します。1,001件以上は黙って切り捨てず、条件追加を案内する400になります。下書き削除時に履歴も削除する設計であり、完全な監査台帳ではありません。
 
+demoプロファイルの45件は、変更可能な件名ではなくV2で追加した永続seed marker（`expense-01`〜`expense-45`）で投入済み判定を行います。件名変更・同名申請・seed下書き削除後の再起動でも、既存データを復活・増殖させません。V1は変更せず、既存DBの正規件名はV2適用時に一度だけmarkerへ移行します。
+
 ## 起動手順
 
 ### Docker Compose（推奨）
@@ -61,6 +63,8 @@ DB接続先は環境変数で変更できます。詳細は `.env.example` を�
 ```
 
 認証、未認証アクセス、CSRF拒否、Flyway適用、申請の作成・編集・申請、承認・差戻し、権限・検索・競合・履歴ロールバックをTestcontainersのPostgreSQLで検証します。Dockerが起動していない環境ではTestcontainersテストは実行できません。
+
+GitHub Actionsの`dependency-scan` jobでは、Maven依存を解決してからTrivy 0.58.2で`pom.xml`と生成jarを走査し、JSONレポートをartifactへ保存します。アプリ依存の一括アップグレードは行いません。
 
 ## 3分デモ
 

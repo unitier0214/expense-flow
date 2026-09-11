@@ -1,21 +1,21 @@
 # Test Cases
 
-フェーズ1の既存テストの意味を維持した。フェーズ2レビュー修正後は32テスト、フェーズ3ではApprovalIntegrationTest 10件を追加し、フェーズ4では既存のdemo初期化テストとCompose smokeを拡張した。フェーズ5ではCsvIntegrationTest 7件を追加し、合計49テストを実行した。CSVはフェーズ5として扱う。
+フェーズ1の既存テストの意味を維持した。フェーズ2レビュー修正後は32テスト、フェーズ3ではApprovalIntegrationTest 10件を追加し、フェーズ4では既存のdemo初期化テストとCompose smokeを拡張した。フェーズ5ではCsvIntegrationTest 7件を追加した。最終レビュー対応では全角空白の回帰2件とV2移行回帰1件を追加し、合計52テストを実行する。CSVはフェーズ5として扱う。
 
 | ID | フェーズ2〜4での対応範囲 | 手段・主な確認 |
 |---|---|---|
 | T01 | 対応済み | Testcontainers PostgreSQL + MockMvcでログイン、未認証リダイレクト、ログイン／ログアウトCSRF拒否、ログアウト後の保護URL再認証を確認 |
-| T02 | 対応済み | 件名・用途のtrimと上限、分類、JST当日以前、金額の最小／最大・範囲外・小数・指数・カンマ・非数値、元入力保持を確認 |
-| T03 | 対応済み | 本人の作成→編集→申請、RETURNED fixtureの編集→再申請、編集入力エラーから元IDへ復帰、DB状態・submitted_at・CREATE/UPDATE/SUBMIT履歴を確認 |
+| T02 | 対応済み | 件名・用途の`String.strip()`（全角スペースを含む）と上限、分類、JST当日以前、金額の最小／最大・範囲外・小数・指数・カンマ・非数値、元入力保持を確認 |
+| T03 | 対応済み | 本人の作成→編集→申請、RETURNED fixtureの編集→再申請、編集入力エラーから元IDへ復帰、全角空白の作成・編集400、DB状態・submitted_at・CREATE/UPDATE/SUBMIT履歴を確認 |
 | T04 | 対応済み | 同部署の別APPROVERによる承認、任意コメント、承認後の再承認・編集拒否をHTTPとDB履歴で確認 |
-| T05 | 対応済み | 理由なし・501文字差戻しの400、trim後理由の保存、RETURNEDの本人編集→再申請を確認 |
+| T05 | 対応済み | 理由なし・全角空白・501文字差戻しの400、`strip()`後理由の保存、RETURNEDの本人編集→再申請を確認 |
 | T06 | 対応済み | 社員の承認操作403、自己承認・他部署・DRAFT対象404、同部署承認者のSUBMITTED詳細・履歴閲覧を確認 |
 | T07 | 対応済み | URL／POST ID改変、`applicant_id`・`department_id`・`status`等の余計なパラメータを無視し、所有者・部署・状態が変わらないことを確認 |
 | T08 | 対応済み | 承認version欠落／型不正／古い値、不正遷移、承認対承認・承認対差戻しを独立トランザクションで競合させ、成功1・楽観ロック競合1と勝者の履歴だけを確認 |
 | T09 | 対応済み | PostgreSQLトリガーでAPPROVE／RETURN履歴保存を失敗させ、状態・version・履歴の双方がロールバックすることを確認 |
 | T10 | 対応済み | 本人限定の状態・分類・利用日期間・件名検索、両端含み、`%`／`_`のリテラル扱い、条件保持、0件、21件以上の20件ページング、不正検索400を確認 |
 | T11 | 対応済み | 件名・用途を一覧・詳細でHTMLエスケープ表示し、タグが実行されないことを確認 |
-| T12 | 対応済み | 新規PostgreSQLへのFlyway V1、Java 21のtest／verify、ComposeのDB readiness・healthcheck・ログインから永続化までを確認。Phase4では作成→編集→申請→差戻し→再申請→承認→ログアウトまで拡張 |
+| T12 | 対応済み | 新規PostgreSQLへのFlyway V1/V2、Java 21のtest／verify、ComposeのDB readiness・healthcheck・ログインから永続化までを確認。Phase4では作成→編集→申請→差戻し→再申請→承認→ログアウトまで拡張 |
 | T13 | 対応済み | CSVの認可、一覧と同じ検索・並び順、0件、1,000件、1,001件、UTF-8 BOM、日本語・引用符・カンマ・改行・数式対策、ヘッダー・固定ファイル名・検索条件保持をTestcontainers + MockMvcで確認 |
 
 自動テストはRepositoryのモックだけで済ませず、TestcontainersのPostgreSQL 17とMockMvcを使用する。RETURNED／APPROVEDの状態fixtureはテスト側のJDBCで用意し、実アプリケーションに状態変更の裏口は追加していない。
@@ -25,3 +25,11 @@
 フェーズ4では、`src/main/java/jp/example/expenseflow/config/DemoDataInitializer.java`が営業部23件・開発部22件の45件を状態分散して投入し、CREATE／SUBMIT／RETURN／APPROVE履歴を生成することを確認した。`DemoDataInitializerIntegrationTest`は再実行時の件数、既存申請の内容、履歴が変わらないことを検証する。Compose smokeは実HTMLからCSRF・versionを抽出し、対象申請の件名と状態ラベル、差戻し理由、承認コメント、履歴表示を確認する。
 
 フェーズ5のCSVテストは `src/test/java/jp/example/expenseflow/feature/expense/CsvIntegrationTest.java` に置いた。CSVは本人のDB検索結果だけを出力し、status・category・利用日両端・件名検索、更新日時降順を検証する。1,000件は全行、1,001件は400と絞り込み案内を確認し、BOM、固定ヘッダー、Content-Disposition、RFC 4180相当の引用、改行・引用符・カンマ、日本語、数式セル接頭辞をバイト列・文字列で検証する。CIのCompose smokeでも実HTMLの検索条件を使ったCSV 200と対象行を確認する。
+
+## 最終レビュー回帰
+
+- `DemoDataInitializerIntegrationTest.demoDataIsCreatedIdempotently`は、seed markerの件数、同名申請の追加、seed申請の件名変更、DRAFT seedの削除、initializerの複数回実行後に申請・履歴が復活・増殖しないことを確認する。
+- `DemoSeedMigrationIntegrationTest.v2BackfillsDuplicateLegacyTitlesOnce`は、新規PostgreSQLでV1だけを適用した既存DBに同名の旧デモ申請を用意し、V2が最小IDを一つのseedへバックフィルすることを確認する。
+- `ExpenseIntegrationTest.fullWidthWhitespaceIsRejectedForCreateAndEditWithoutChangingData`は、件名・用途の全角スペースだけを項目別400とし、申請・version・履歴を変えず、Entityの直接業務メソッドも同じ判定になることを確認する。
+- `ApprovalIntegrationTest.fullWidthWhitespaceReturnReasonIsRejectedWithoutChangingHistory`は、全角スペースだけの差戻し理由を項目別400とし、状態・version・履歴を変えないことを確認する。
+- `.github/workflows/ci.yml`のPlaywright実ブラウザ smokeは、CI上のChromiumでログイン、作成、編集エラーからの元URL復帰、訂正、申請、差戻し、再申請、別承認者の承認、ログアウト後の保護URL拒否を操作し、画面スクリーンショットをartifactへ保存する。

@@ -74,3 +74,11 @@
 - CSVの文字列セルは、先頭の空白を飛ばした最初の文字が`=`, `+`, `-`, `@`または制御文字の場合にアポストロフィを付ける。IDと検証済み整数金額は数値列としてそのまま出力し、doubleや丸めは使わない。
 - CSVの検索条件は一覧画面のstatus/category/from/to/qをリンクへ引き継ぐ。エクスポートはGETであり、一覧と同じ認可をServiceで行うため、CSRFトークンを追加する設計にはしない。通常の変更POSTとログアウトのCSRF保護は維持する。
 - CSV実装はフェーズ4の必須機能完成後の独立変更とし、Testcontainers PostgreSQLの`CsvIntegrationTest` 7件を追加してT13を確認した。テスト専用ClockのBean名重複は`@Primary`で解消し、本番Beanへ特例を持ち込まない。
+
+## 2026-09-11：最終レビュー対応
+
+- 旧実装の件名ベース判定では、同名申請・件名変更・seed下書き削除を区別できず、再起動時の復活や増殖を防げない。V1は変更せず、V2で`demo_seed_entries`を追加し、`expense-01`〜`expense-45`を投入済みの永続キーとする。マーカーにはexpense_idを記録するが、申請削除後も残すためFKは付けない。
+- V2の移行処理は、旧実装の正規件名に一致する行をseedごとに最小IDへ一度だけバックフィルする。同名の旧行が複数ある場合もマーカーは1件だけにする。V2適用前にすでに改名・削除された行は、旧DBにseed識別子が存在しないため、完全な復元や判定はできない。この限界を資料に残し、V2適用後の再起動ではマーカーを唯一の判定にする。
+- 件名・用途・差戻し理由の空白処理は、ServiceとEntityでJava `String.strip()`へ統一する。`IllegalArgumentException`を一律にHTTP 400へ変換せず、Serviceの項目別入力エラーで先に検証し、Entityは直接呼び出し時にも同じ業務ルールを守る。
+- 実ブラウザ検証はローカル環境にJava 21／Docker／起動アプリがないため、CIのUbuntu runnerへChromium＋Playwrightの実DOM操作を追加し、主要フローと編集エラー復帰を検証する。curlのCompose smokeはHTTP検証として別に扱い、スクリーンショットはActions artifactへ保存する。
+- 依存脆弱性検査はアプリ依存を一括更新せず、CIでMaven依存を解決した後、Trivy 0.58.2で`pom.xml`と生成jarを走査する専用jobを追加する。JSONレポートをartifactへ保存する。OWASP Dependency-Check 13.0.0も試行したが、NVD APIキーなしでは現行APIからデータを取得できなかったため、結果の根拠には採用せず、制約を`docs/test-results.md`へ記録する。

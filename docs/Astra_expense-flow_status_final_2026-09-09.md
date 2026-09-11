@@ -4,6 +4,8 @@
 
 この資料は、ExpenseFlowをフェーズ1〜5まで実装した時点でAstraへ引き継ぐための報告である。最終的な合否判定はAstraに委ねる。この作業結果をAstra確認済みとは記載しない。
 
+> 2026-09-11更新：以下の2026-09-09時点の記録に加え、レビュー対象 [`a16b3808`](https://github.com/unitier0214/expense-flow/commit/a16b38083aed0d1b417e2c6b015743dab50e4be4) への最終レビュー対応を実施した。最新の検証結果は末尾の「最終レビュー対応」を参照する。
+
 - リポジトリ：[unitier0214/expense-flow](https://github.com/unitier0214/expense-flow)
 - 設計の正本：[docs/design.md](design.md)
 - 開始時のレビュー対象：[`4077b2bd`](https://github.com/unitier0214/expense-flow/commit/4077b2bd34f822f91e961ce2c067fbafa8ea5db9)
@@ -95,3 +97,26 @@ SPRING_PROFILES_ACTIVE=demo docker compose up --build
 - 実装・CI・資料はフェーズ5まで進めた。次はAstraによる最終レビューであり、Astraの承認や合否をこの報告から先取りしない。
 - 設計の正本は`docs/design.md`、学習・説明は`docs/learning-guide.md`、判断理由は`docs/decisions.md`に記録した。
 - 新規デプロイ、課金サービス契約、外部連絡、実運用秘密情報の追加は今回の範囲外である。
+
+## 最終レビュー対応（2026-09-11）
+
+### 対応内容
+
+- 件名検索に依存していた`DemoDataInitializer`の投入済み判定を、V2で追加した`demo_seed_entries`の永続キーへ移した。旧正規件名はseedごとに一つだけバックフィルし、マーカーに申請へのFKを持たせないため、同名申請の追加、seed件名の変更、seed下書きの削除後も再起動で復活・増殖しない。
+- 件名・用途・差戻し理由のService／Entity間の空白判定を`String.strip()`へ統一し、全角スペースだけの入力を項目別メッセージ付き400で拒否する回帰テストを追加した。汎用`IllegalArgumentException`の一律400変換は行っていない。
+- CIにChromium＋Playwrightの実DOM smokeを追加し、主要フロー、編集入力エラーから同一申請への復帰、ログアウト後の保護URL拒否、スクリーンショット取得を実行した。
+- 依存脆弱性検査はTrivy 0.58.2を採用し、検査結果をJSON artifactへ保存した。OWASP Dependency-CheckはNVD APIキーなしで現行APIからデータ取得できず、0件の根拠にはしていない。
+
+### 対象SHAと検証結果
+
+- コード・V2・回帰テスト：[`6a7c357b`](https://github.com/unitier0214/expense-flow/commit/6a7c357b50582e6120bf5be581a8515b2e12e93f)。[run 34610990791](https://github.com/unitier0214/expense-flow/actions/runs/34610990791)でtest／verify／Compose smoke成功。
+- ブラウザ・Trivyを含む最終検証：[`7bb01ba1`](https://github.com/unitier0214/expense-flow/commit/7bb01ba1d56f879a1d86f417b1ae222266c7a365)。[run 34612201340](https://github.com/unitier0214/expense-flow/actions/runs/34612201340)でtest 52件、verify、Compose設定・smoke、Chromium＋Playwright smoke、Trivy検査がすべて成功。
+- ブラウザのスクリーンショット：[Actions artifact](https://github.com/unitier0214/expense-flow/actions/runs/34612201340/artifacts/10268903974)。Trivy JSON：[artifact](https://api.github.com/repos/unitier0214/expense-flow/actions/artifacts/10268932881/zip)。Trivy検出数は0件だった。
+
+### 未確認事項・既知の制約
+
+- ローカルはJava 17.0.20、Docker CLIなし、Maven Centralの名前解決不可のため、ローカルtest／verify／Testcontainers／Compose／アプリ起動／実ブラウザ目視は未実行。実ブラウザ操作はCI上のChromiumで実行済みであり、curlによるHTTP smokeとは区別している。
+- OWASP Dependency-CheckのNVD APIキー付き再検査は未実行。代替のTrivyは検査時点のDBで0件だったが、将来の新規脆弱性やNVD APIキー付き検査を保証しない。
+- V2適用前に旧実装上ですでに改名・削除されたseed申請は、V1にseed識別子がないため完全には推定できない。V2適用後は永続markerを唯一の投入済み判定にする。
+
+最終的な合否判定はAstraに委ねる。Astraによる確認済み・合格済みとは記載していない。

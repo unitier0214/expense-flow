@@ -75,10 +75,10 @@ stateDiagram-v2
 
 - DRAFT / RETURNEDだけ本人が編集できる。編集では状態を変えない。削除はDRAFTだけ。
 - APPROVEDは終端。取消し・承認解除・申請取下げは対象外。
-- 件名：trim後1〜100文字。用途：trim後1〜500文字。分類：TRANSPORT / SUPPLIES / OTHERの固定値。
+- 件名：Unicode空白を`String.strip()`で除去した後の1〜100文字。用途：同じく`strip()`後の1〜500文字。全角スペース（U+3000）だけの入力も空文字として400にする。分類：TRANSPORT / SUPPLIES / OTHERの固定値。
 - 利用日：必須、Asia/Tokyoでの当日以前。Clockを注入してテストを固定可能にする。
-- 金額：画面から受け取った文字列をtrimし、半角数字のみ（正規表現`[0-9]+`）であることを確認してからJava BigDecimalへ変換する。値は1〜1,000,000円の整数に限り、小数表記（`1.5`、`1.0`）、指数表記（`1e3`）、カンマ、非数値、範囲外を400で拒否する。400のフォーム再表示では元の入力文字列を保持する。Java BigDecimal、DB NUMERIC(12,0)。DBの丸めに頼らず、サービス層とドメインでも整数値・範囲を検証する。
-- 差戻し理由：trim後1〜500文字、差戻し時必須。承認コメントは任意で500文字以内。
+- 金額：画面から受け取った文字列を`String.strip()`し、半角数字のみ（正規表現`[0-9]+`）であることを確認してからJava BigDecimalへ変換する。値は1〜1,000,000円の整数に限り、小数表記（`1.5`、`1.0`）、指数表記（`1e3`）、カンマ、非数値、範囲外を400で拒否する。400のフォーム再表示では元の入力文字列を保持する。Java BigDecimal、DB NUMERIC(12,0)。DBの丸めに頼らず、サービス層とドメインでも整数値・範囲を検証する。
+- 差戻し理由：`String.strip()`後1〜500文字、差戻し時必須。全角スペースだけの理由も400にする。承認コメントは任意で500文字以内で、保存時は同じ空白規則で正規化する。
 - 下書き保存にも上記経費項目の入力要件を適用する（未入力の一時保存は対象外）。
 - 作成者・部署・状態・承認者・合計・日時はサーバーが決める。クライアント入力を信用しない。
 - 編集・削除・申請・承認・差戻しにはversionを必須送信し、DBの@Versionと比較。古い画面や並行更新は409で再読込案内、上書きしない。
@@ -95,6 +95,7 @@ stateDiagram-v2
 | users | id PK, department_id FK NOT NULL, username UNIQUE NOT NULL, display_name, password_hash, role CHECK(EMPLOYEE/APPROVER), enabled |
 | expense_requests | id PK, applicant_id FK NOT NULL, department_id FK NOT NULL, title varchar(100), purpose varchar(500), category varchar(30), expense_date date, amount numeric(12,0), status varchar(20), version bigint NOT NULL, created_at, updated_at, submitted_at nullable |
 | expense_events | id PK, expense_id FK ON DELETE CASCADE, actor_id FK NOT NULL, action, from_status nullable, to_status, comment varchar(500) nullable, occurred_at |
+| demo_seed_entries | seed_key PK, expense_id nullable, created_at。V2で追加するdemo専用の投入済みマーカー。expense_requestsへのFKは持たせず、件名変更や下書き削除後もseed_keyを残す |
 
 expense_requestsの必須項目にNOT NULL、金額にCHECK、状態・分類にCHECK。department_idは作成時に本人部署から設定するスナップショット。イベントはCREATE / UPDATE / SUBMIT / APPROVE / RETURNで追記のみ、UPDATEは変更事実を記録し全項目の旧値比較は対象外。再申請もSUBMIT、submitted_atは直近の申請日時に更新。下書き削除は履歴も削除するため、完全な監査台帳ではないことをREADMEに明記する。
 
@@ -147,7 +148,7 @@ expense_requestsの必須項目にNOT NULL、金額にCHECK、状態・分類に
 
 ## 9. デモ・運用・成果物
 
-demoプロファイル限定で架空データを冪等投入：営業部に社員1名・承認者2名、開発部に社員1名・承認者1名、状態を分散した申請45件。ページング・差戻し・部署制限を再現可能にする。デモ認証情報はdemo限定。通常プロファイルに固定ユーザーを生成しない。パスワード等をログに出さない。
+demoプロファイル限定で架空データを冪等投入：営業部に社員1名・承認者2名、開発部に社員1名・承認者1名、状態を分散した申請45件。ページング・差戻し・部署制限を再現可能にする。投入済み判定は変更可能な件名ではなく、V2の`demo_seed_entries`に`expense-01`〜`expense-45`を記録する。既存DBへのV2適用時は、旧実装の正規件名に一致する行を各seedへ一度だけバックフィルする。旧実装時点ですでに改名・削除された申請には履歴上のseed識別子がないため、V2で完全に推測することはできない。この限界は資料へ明記する。デモ認証情報はdemo限定。通常プロファイルに固定ユーザーを生成しない。パスワード等をログに出さない。
 
 まずローカルでdocker compose up --buildにより起動。公開デプロイは別作業とし、共有アカウント・データ分離・リセット・レート制限・HTTPSを設計してから行う。DBポートは必要時だけlocalhostへ公開。アプリhealthcheck、DB readiness、DB永続ボリュームを用意。DB破棄は明示的な手順に分離する。
 

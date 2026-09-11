@@ -145,3 +145,57 @@ CSV実装の検証対象は [`41f90066a190dc8f0f78faba1849f4b044b19722`](https:/
 - 実ブラウザ操作・目視・スクリーンショット：ローカルでアプリを起動できず、ブラウザ環境もないため未実施。CIのcurlによるHTML／HTTP検証をブラウザ確認とは呼んでいない。
 
 上記の未実行は仕様を緩めた結果ではない。テストの無効化・スキップ、H2やモックDBへの置換は行っていない。
+
+## 最終レビュー対応（2026-09-11）
+
+### 対象と実行環境
+
+レビュー開始時の対象は [`a16b3808`](https://github.com/unitier0214/expense-flow/commit/a16b38083aed0d1b417e2c6b015743dab50e4be4) だった。既存の変更を保護した検証用ブランチ `final-review-fix-20260911` で修正を行い、Java 21・Spring Boot 4.1.1・PostgreSQL 17.11・Dockerを備えたGitHub Actionsで検証した。
+
+- コード・V2・回帰テストの検証コミット：[`6a7c357b`](https://github.com/unitier0214/expense-flow/commit/6a7c357b50582e6120bf5be581a8515b2e12e93f)
+- 上記コードのCI：[run 34610990791](https://github.com/unitier0214/expense-flow/actions/runs/34610990791)。test／verify／Compose smoke成功。
+- ブラウザ・脆弱性検査を含む最終検証コミット：[`7bb01ba1`](https://github.com/unitier0214/expense-flow/commit/7bb01ba1d56f879a1d86f417b1ae222266c7a365)
+- 最終CI：[run 34612201340](https://github.com/unitier0214/expense-flow/actions/runs/34612201340)。test、verify、Compose設定、Compose smoke、Chromium smoke、Trivy検査の全job成功。
+
+### 最終結果
+
+| 検証 | 結果 |
+|---|---|
+| `./mvnw --batch-mode test` | 成功。52テスト、失敗0・エラー0・スキップ0（Expense 20、Approval 11、CSV 7、Security 12、Demo initializer 1、V2移行 1） |
+| `./mvnw --batch-mode verify` | 成功。52テストとパッケージングが完了 |
+| `docker compose config --quiet` | 成功 |
+| Flyway V1／V2 + PostgreSQL 17 | 成功。V1を変更せず、V2のseed marker作成と旧正規件名の重複バックフィルを実DBで確認 |
+| デモ再初期化 | 成功。同名申請の追加、seed件名変更、seed DRAFT削除、initializer複数回実行後も申請45件・履歴101件・marker45件を維持し、削除行を復活させないことを確認 |
+| 全角空白入力 | 成功。作成件名、編集用途、差戻し理由を項目別400とし、状態・version・履歴を変更しないことを確認。Service／Entityの`strip()`判定も確認 |
+| Compose smoke | 成功。既存の作成→編集→申請→差戻し→修正・再申請→別承認者承認→詳細・履歴→ログアウト、検索条件付きCSV、保護URL拒否、DB永続化を確認 |
+| 実ブラウザ | 成功。CI上のChromium＋Playwrightでログイン、作成、編集エラーから同一IDへ復帰、訂正、申請、差戻し、再申請、別承認者の承認、ログアウト後の保護URL拒否を実DOM操作で確認 |
+| ブラウザ画面 | 成功。スクリーンショットを [browser artifact](https://github.com/unitier0214/expense-flow/actions/runs/34612201340/artifacts/10268903974) に保存（ログイン、一覧、作成詳細、編集エラー、編集後、差戻し、承認済み、ログイン復帰） |
+| 依存脆弱性検査 | 成功。Maven依存を解決してTrivy 0.58.2で`pom.xml`と生成jarを走査し、検出0件。JSONは [Trivy report artifact](https://api.github.com/repos/unitier0214/expense-flow/actions/artifacts/10268932881/zip) に保存 |
+
+### 最終レビュー指摘への対応
+
+- `DemoDataInitializer`は件名検索をやめ、`demo_seed_entries`の`expense-01`〜`expense-45`を投入済み判定に使う。マーカーは`expense_requests`へのFKを持たず、seed申請の件名変更・削除後も残る。V2は旧実装の正規件名に一致する行をseedごとに一つだけバックフィルする。
+- 件名・用途・差戻し理由をServiceとEntityで`String.strip()`へ揃え、全角スペースだけの値がEntityまで到達して500になる経路をなくした。Serviceでは項目別`ExpenseInputException`／`ApprovalInputException`を先に返し、汎用`IllegalArgumentException`の一律400化は行っていない。
+- 既存の同時更新テストは独立トランザクション、version読み取り同期、flush／commit、例外原因、最終値・version・履歴を検証する状態を維持した。最終コードでは20件のExpenseテスト、11件のApprovalテストが通過した。
+
+### 依存脆弱性検査の経緯と未解決事項
+
+- 最初にOWASP Dependency-Check Maven Plugin 13.0.0を実行したが、[run 34611756067](https://github.com/unitier0214/expense-flow/actions/runs/34611756067)では現行NVD APIが空のAPIキーを拒否し、NVDデータがないため分析を完了できなかった。これは脆弱性0件の結果として扱っていない。
+- 代替として最終CIで、`./mvnw --batch-mode -DskipTests package`後に次のTrivy走査を実行した。
+
+  ```bash
+  docker run --rm -v "$GITHUB_WORKSPACE:/src" -w /src \
+    aquasec/trivy:0.58.2 \
+    fs --scanners vuln --format json --output trivy-report.json \
+    --exit-code 0 --no-progress --skip-dirs .git .
+  ```
+
+- Trivyの結果は検出0件だった。スキャン時点のTrivy vulnerability DBに基づく結果であり、将来の新規脆弱性や、NVD APIキーを取得して実行するOWASPレポートを代替するものではない。アプリ依存の無関係な一括アップグレードは行っていない。
+
+### ブラウザとローカル環境
+
+- ローカルでは標準Javaが17.0.20、Docker CLIがなく、`./mvnw --batch-mode compile`はMaven Central (`repo.maven.apache.org`) の名前解決失敗で依存取得前に終了した。ローカルのtest／verify／Testcontainers／Compose／アプリ起動は未実行である。
+- ローカルの実ブラウザ操作・目視は未実行。代わりに最終CIで実Chromiumを起動し、上記の操作とスクリーンショット保存を完了した。CIのcurl smokeとPlaywrightブラウザ確認は区別している。
+- V2適用前に旧実装上ですでに改名・削除されたseed申請は、V1にseed識別子がないため完全には推測できない。V2は既存の正規件名を安全にバックフィルし、V2適用後は永続markerで再作成を防ぐ設計とした。
+
+テストの無効化・スキップ、H2やモックDBへの置換、Java 17への変更、CSRF無効化、V1の書き換え、実運用秘密情報のコミットは行っていない。

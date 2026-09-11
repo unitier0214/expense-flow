@@ -90,3 +90,24 @@
 - ローカルの標準Javaは17.0.20で、Java 21を明示したMaven実行もMaven Centralの名前解決失敗により依存取得前に終了した。
 - Docker CLIがないため、ローカルTestcontainers、Compose、アプリ起動、実ブラウザ目視、スクリーンショット取得は未実行。GitHub ActionsではJava 21・PostgreSQL 17.11・Dockerを使ったHTTP smokeを実行したが、curl検証をブラウザ確認とは呼んでいない。
 - テストの無効化・スキップ、H2やモックDBへの置換は行っていない。
+
+## 最終レビュー対応（2026-09-11）
+
+レビュー対象 [`a16b3808`](https://github.com/unitier0214/expense-flow/commit/a16b38083aed0d1b417e2c6b015743dab50e4be4) の状態を起点に、既存のフェーズ1〜5の実装を保護して仕上げ対応を行った。
+
+- 件名依存だった`DemoDataInitializer`の投入済み判定を、V2で追加した`demo_seed_entries`の`expense-01`〜`expense-45`へ移した。V2は旧正規件名をseedへ一度だけバックフィルし、マーカーは申請へのFKを持たないため、件名変更・同名追加・seed下書き削除後も再起動で復活・増殖しない。
+- `ExpenseService`、`ExpenseRequest`、`ExpenseEvent`の空白処理を`String.strip()`へ揃え、全角スペースだけの件名・用途・差戻し理由を項目別400で拒否する回帰テストを追加した。入力不備を一律例外変換で処理する実装にはしていない。
+- `DemoDataInitializerIntegrationTest`を再初期化・同名・改名・削除まで拡張し、`DemoSeedMigrationIntegrationTest`で既存DBのV1→V2バックフィルを実PostgreSQLで検証した。
+- 実ブラウザ確認用にCIへChromium＋Playwright smokeを追加した。編集エラーから同一申請へ復帰する画面を含む主要フローを操作し、スクリーンショットをActions artifactへ保存する。
+- 依存脆弱性検査はCIの`dependency-scan` jobでMaven依存を解決後、Trivy 0.58.2のvulnerability scanを実行する。OWASP Dependency-Check 13.0.0はNVD APIキーなしでデータ取得できず失敗したため、最終判定に流用せず未解決事項として記録する。
+
+コード・マイグレーションの検証対象は [`6a7c357b`](https://github.com/unitier0214/expense-flow/commit/6a7c357b50582e6120bf5be581a8515b2e12e93f)、CI [run 34610990791](https://github.com/unitier0214/expense-flow/actions/runs/34610990791)でtest／verify／Compose smokeが成功した。ブラウザとTrivyを含む最終CIは、結果確定後にこの資料と最終引き継ぎ資料へ追記する。
+
+ローカルの標準Javaは17.0.20、Docker CLIは未導入であり、ローカルMaven（依存取得先の名前解決失敗）、Testcontainers、Compose、アプリ起動、実ブラウザ目視は引き続き未実行。CIではJava 21・PostgreSQL 17・Dockerを使用し、Playwrightによる実ブラウザ操作とスクリーンショット取得まで実行した。
+
+### 最終レビュー検証結果の確定
+
+- ブラウザ・Trivyを含む最終検証対象は [`7bb01ba1`](https://github.com/unitier0214/expense-flow/commit/7bb01ba1d56f879a1d86f417b1ae222266c7a365)、CI [run 34612201340](https://github.com/unitier0214/expense-flow/actions/runs/34612201340)である。test 52件、verify、Compose設定・smoke、Chromium＋Playwright smoke、Trivy検査がすべて成功した。
+- 実ブラウザのスクリーンショットは [Actions artifact](https://github.com/unitier0214/expense-flow/actions/runs/34612201340/artifacts/10268903974)、Trivy JSONは [artifact](https://api.github.com/repos/unitier0214/expense-flow/actions/artifacts/10268932881/zip) に保存した。Trivy検出数は0件だった。
+- OWASP Dependency-CheckはNVD APIキーなしでは現行APIからデータを取得できず、[run 34611756067](https://github.com/unitier0214/expense-flow/actions/runs/34611756067)を脆弱性0件とは扱っていない。代替のTrivy結果も検査時点の結果であり、将来の新規脆弱性やAPIキー付きNVD検査を保証しない。
+- V2適用前に改名・削除されたseed申請は、V1にseed識別子がないため完全には推定できない。V2適用後は永続markerを唯一の投入済み判定にする。
