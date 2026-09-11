@@ -359,26 +359,122 @@ jobs:
       - run: chmod +x mvnw
       - name: Resolve Maven dependencies for scanning
         run: ./mvnw --batch-mode -DskipTests package
+      - name: Generate runtime dependency SBOM
+        run: |
+          ./mvnw --batch-mode -DskipTests dependency:tree \
+            -Dscope=runtime \
+            -DoutputFile=target/runtime-dependency-tree.txt
+          ./mvnw --batch-mode -DskipTests \
+            -DincludeCompileScope=true \
+            -DincludeRuntimeScope=true \
+            -DincludeProvidedScope=false \
+            -DincludeSystemScope=false \
+            -DincludeTestScope=false \
+            org.cyclonedx:cyclonedx-maven-plugin:2.9.1:makeAggregateBom
+          test -s target/bom.json
+          jar_file=$(find target -maxdepth 1 -type f -name 'expense-flow-*.jar' | head -n 1)
+          test -n "$jar_file"
+          jar tf "$jar_file" \
+            | sed -n 's#^BOOT-INF/lib/\(.*\.jar\)$#\1#p' \
+            | sort > target/runtime-dependencies.txt
+          test -s target/runtime-dependencies.txt
+          python3 - target/bom.json "$jar_file" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          bom_path = pathlib.Path(sys.argv[1])
+          jar_file = sys.argv[2]
+          with bom_path.open(encoding="utf-8") as bom_file:
+              bom = json.load(bom_file)
+          components = bom.get("components") or []
+          if not components:
+              raise SystemExit("runtime SBOM contains no components")
+
+          runtime_jars = pathlib.Path("target/runtime-dependencies.txt").read_text(
+              encoding="utf-8"
+          ).splitlines()
+          if not runtime_jars:
+              raise SystemExit("Spring Boot jar contains no BOOT-INF/lib runtime dependencies")
+
+          inventory = {
+              "sbom": {
+                  "bomFormat": bom.get("bomFormat"),
+                  "specVersion": bom.get("specVersion"),
+                  "componentCount": len(components),
+              },
+              "bootJar": {
+                  "file": jar_file,
+                  "runtimeLibraryCount": len(runtime_jars),
+                  "runtimeLibraries": runtime_jars,
+              },
+              "packages": [
+                  {
+                      "name": component.get("name"),
+                      "version": component.get("version"),
+                      "scope": component.get("scope"),
+                      "purl": component.get("purl"),
+                  }
+                  for component in components
+              ],
+          }
+          pathlib.Path("target/runtime-dependency-inventory.json").write_text(
+              json.dumps(inventory, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          print("SBOM format:", bom.get("bomFormat"))
+          print("SBOM components:", len(components))
+          print("Spring Boot runtime libraries:", len(runtime_jars))
+          for component in components:
+              print(
+                  "SBOM package:",
+                  component.get("name"),
+                  component.get("version"),
+                  component.get("scope"),
+              )
       - name: Run Trivy dependency vulnerability scan
         run: |
           docker run --rm \
             -v "$GITHUB_WORKSPACE:/src" \
             -w /src \
             aquasec/trivy:0.58.2 \
-            fs --scanners vuln --format json --output trivy-report.json \
-            --exit-code 0 --no-progress --skip-dirs .git .
+            sbom --scanners vuln --format json --output trivy-report.json \
+            --exit-code 0 --no-progress target/bom.json
           test -s trivy-report.json
-          python3 - trivy-report.json <<'PY'
+          python3 - trivy-report.json target/runtime-dependency-inventory.json <<'PY'
           import json
+          import pathlib
           import sys
 
           with open(sys.argv[1], encoding="utf-8") as report_file:
               report = json.load(report_file)
+          with open(sys.argv[2], encoding="utf-8") as inventory_file:
+              inventory = json.load(inventory_file)
+          if not inventory.get("packages"):
+              raise SystemExit("dependency inventory is empty")
+          if not inventory.get("bootJar", {}).get("runtimeLibraryCount"):
+              raise SystemExit("runtime dependency inventory is empty")
+          results = report.get("Results") or []
+          if not results:
+              raise SystemExit("Trivy returned no analysis target")
+          if not any(result.get("Type") == "cyclonedx" for result in results):
+              raise SystemExit("Trivy did not analyze a CycloneDX SBOM target")
+          print("Trivy artifact:", report.get("ArtifactName"))
+          print("Trivy artifact type:", report.get("ArtifactType"))
+          for result in results:
+              print(
+                  "Trivy target:",
+                  result.get("Target"),
+                  "class=", result.get("Class"),
+                  "type=", result.get("Type"),
+              )
           vulnerabilities = []
           for result in report.get("Results", []):
               for vulnerability in result.get("Vulnerabilities") or []:
                   vulnerabilities.append(vulnerability)
-          print(f"Trivy vulnerabilities detected: {len(vulnerabilities)}")
+          print("SBOM packages analyzed:", len(inventory["packages"]))
+          print("Spring Boot runtime libraries recorded:", inventory["bootJar"]["runtimeLibraryCount"])
+          print(f"Trivy vulnerable packages detected: {len(vulnerabilities)}")
           counts = {}
           for vulnerability in vulnerabilities:
               severity = vulnerability.get("Severity", "UNKNOWN")
@@ -391,11 +487,18 @@ jobs:
                   vulnerability.get("InstalledVersion"),
                   vulnerability.get("Severity"),
               )
+          if vulnerabilities:
+              raise SystemExit("Trivy found vulnerabilities; see the package list above and the JSON artifact")
           PY
       - name: Upload dependency scan report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: expenseflow-trivy-report
-          path: trivy-report.json
+          name: expenseflow-dependency-scan
+          path: |
+            trivy-report.json
+            target/bom.json
+            target/runtime-dependency-tree.txt
+            target/runtime-dependencies.txt
+            target/runtime-dependency-inventory.json
           if-no-files-found: warn
