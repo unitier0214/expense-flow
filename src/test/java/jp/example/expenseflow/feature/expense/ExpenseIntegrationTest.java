@@ -1,6 +1,7 @@
 package jp.example.expenseflow.feature.expense;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -207,6 +208,65 @@ class ExpenseIntegrationTest {
 
         assertThat(expenseRequestRepository.count()).isZero();
         assertThat(expenseEventRepository.count()).isZero();
+    }
+
+    @Test
+    void fullWidthWhitespaceIsRejectedForCreateAndEditWithoutChangingData() throws Exception {
+        MockHttpSession session = loginAs(employee.getUsername());
+        String fullWidthWhitespace = "\u3000\u3000";
+
+        mockMvc.perform(post("/expenses")
+                        .session(session)
+                        .with(csrf())
+                        .param("title", fullWidthWhitespace)
+                        .param("purpose", "用途")
+                        .param("category", "OTHER")
+                        .param("expenseDate", "2026-09-09")
+                        .param("amount", "100"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "件名は1〜100文字で入力してください")));
+        assertThat(expenseRequestRepository.count()).isZero();
+        assertThat(expenseEventRepository.count()).isZero();
+
+        Long id = createViaHttp(session, "空白確認", "元の用途", "OTHER", "2026-09-09", "100");
+        ExpenseRequest before = findRequest(id);
+        long versionBefore = before.getVersion();
+        int eventCountBefore = expenseEventRepository.findByExpenseIdForDisplay(id).size();
+
+        mockMvc.perform(post("/expenses/{id}/edit", id)
+                        .session(session)
+                        .with(csrf())
+                        .param("title", "空白確認")
+                        .param("purpose", fullWidthWhitespace)
+                        .param("category", "OTHER")
+                        .param("expenseDate", "2026-09-09")
+                        .param("amount", "100")
+                        .param("version", Long.toString(versionBefore)))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "用途は1〜500文字で入力してください")));
+
+        ExpenseRequest unchanged = findRequest(id);
+        assertThat(unchanged.getTitle()).isEqualTo("空白確認");
+        assertThat(unchanged.getPurpose()).isEqualTo("元の用途");
+        assertThat(unchanged.getStatus()).isEqualTo(ExpenseStatus.DRAFT);
+        assertThat(unchanged.getVersion()).isEqualTo(versionBefore);
+        assertThat(expenseEventRepository.findByExpenseIdForDisplay(id))
+                .hasSize(eventCountBefore);
+
+        assertThatThrownBy(() -> ExpenseRequest.create(employee, sales, fullWidthWhitespace,
+                "用途", ExpenseCategory.OTHER, LocalDate.of(2026, 9, 9),
+                new java.math.BigDecimal("100"), FIXED_INSTANT,
+                LocalDate.of(2026, 9, 9)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("件名は1〜100文字で入力してください");
+        assertThatThrownBy(() -> unchanged.updateDetails("空白確認", fullWidthWhitespace,
+                ExpenseCategory.OTHER, LocalDate.of(2026, 9, 9),
+                new java.math.BigDecimal("100"), FIXED_INSTANT,
+                LocalDate.of(2026, 9, 9)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("用途は1〜500文字で入力してください");
     }
 
     @Test

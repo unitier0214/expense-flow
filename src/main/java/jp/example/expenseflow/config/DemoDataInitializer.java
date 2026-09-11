@@ -32,6 +32,7 @@ public class DemoDataInitializer implements ApplicationRunner {
     private final AppUserRepository appUserRepository;
     private final ExpenseRequestRepository expenseRequestRepository;
     private final ExpenseEventRepository expenseEventRepository;
+    private final DemoSeedEntryRepository demoSeedEntryRepository;
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
 
@@ -39,12 +40,14 @@ public class DemoDataInitializer implements ApplicationRunner {
                                AppUserRepository appUserRepository,
                                ExpenseRequestRepository expenseRequestRepository,
                                ExpenseEventRepository expenseEventRepository,
+                               DemoSeedEntryRepository demoSeedEntryRepository,
                                PasswordEncoder passwordEncoder,
                                Clock clock) {
         this.departmentRepository = departmentRepository;
         this.appUserRepository = appUserRepository;
         this.expenseRequestRepository = expenseRequestRepository;
         this.expenseEventRepository = expenseEventRepository;
+        this.demoSeedEntryRepository = demoSeedEntryRepository;
         this.passwordEncoder = passwordEncoder;
         this.clock = clock;
     }
@@ -88,10 +91,11 @@ public class DemoDataInitializer implements ApplicationRunner {
         Instant now = clock.instant();
         LocalDate today = LocalDate.ofInstant(now, ZoneId.of("Asia/Tokyo"));
         for (int number = 1; number <= 45; number++) {
-            String title = String.format("デモ申請-%02d", number);
-            if (expenseRequestRepository.findByTitle(title).isPresent()) {
+            String seedKey = seedKey(number);
+            if (demoSeedEntryRepository.existsById(seedKey)) {
                 continue;
             }
+            String title = String.format("デモ申請-%02d", number);
             boolean isSales = number <= 23;
             Department department = isSales ? sales : development;
             AppUser applicant = isSales ? salesEmployee : developmentEmployee;
@@ -106,6 +110,8 @@ public class DemoDataInitializer implements ApplicationRunner {
             expenseEventRepository.saveAndFlush(ExpenseEvent.record(
                     request, applicant, ExpenseEventAction.CREATE, null,
                     ExpenseStatus.DRAFT, null, createdAt));
+            demoSeedEntryRepository.saveAndFlush(
+                    new DemoSeedEntry(seedKey, request.getId(), createdAt));
 
             if (targetStatus == ExpenseStatus.DRAFT) {
                 continue;
@@ -135,6 +141,10 @@ public class DemoDataInitializer implements ApplicationRunner {
                         ExpenseStatus.APPROVED, "デモ確認済み", decidedAt));
             }
         }
+    }
+
+    private String seedKey(int number) {
+        return String.format("expense-%02d", number);
     }
 
     private ExpenseStatus statusFor(int number) {

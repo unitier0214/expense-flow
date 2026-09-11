@@ -259,6 +259,26 @@ class ApprovalIntegrationTest {
     }
 
     @Test
+    void fullWidthWhitespaceReturnReasonIsRejectedWithoutChangingHistory() throws Exception {
+        Long id = insertSubmittedFixture("全角空白理由", employee, FIXED_INSTANT);
+        MockHttpSession session = loginAs(approver.getUsername());
+
+        mockMvc.perform(post("/expenses/{id}/return", id)
+                        .session(session)
+                        .with(csrf())
+                        .param("version", "0")
+                        .param("comment", "\u3000\u3000"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "差戻し理由は1〜500文字で入力してください")));
+
+        ExpenseRequest unchanged = findRequest(id);
+        assertThat(unchanged.getStatus()).isEqualTo(ExpenseStatus.SUBMITTED);
+        assertThat(unchanged.getVersion()).isEqualTo(0L);
+        assertThat(expenseEventRepository.findByExpenseIdForDisplay(id)).hasSize(2);
+    }
+
+    @Test
     void approvalTargetAccessRejectsSelfOtherDepartmentAndDraft() throws Exception {
         Long selfId = insertSubmittedFixture("承認者本人", approver, FIXED_INSTANT);
         Long otherDepartmentId = insertSubmittedFixture("他部署対象", developmentEmployee, FIXED_INSTANT);

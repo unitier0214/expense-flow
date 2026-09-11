@@ -77,7 +77,7 @@ public class ExpenseEvent {
         if (comment == null) {
             return null;
         }
-        String trimmed = comment.trim();
+        String trimmed = comment.strip();
         return trimmed.isEmpty() ? null : trimmed;
     }
 

@@ -596,7 +596,7 @@ public class ExpenseService {
     }
 
     private String trimToEmpty(String value) {
-        return value == null ? "" : value.trim();
+        return value == null ? "" : value.strip();
     }
 
     private String trimToNull(String value) {

@@ -196,7 +196,7 @@ public class ExpenseRequest {
     }
 
     private static String normalize(String value) {
-        return value == null ? null : value.trim();
+        return value == null ? null : value.strip();
     }
 
     public Long getId() {

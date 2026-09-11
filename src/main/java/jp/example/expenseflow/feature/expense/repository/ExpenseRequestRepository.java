@@ -86,5 +86,4 @@ public interface ExpenseRequestRepository extends JpaRepository<ExpenseRequest, 
     @Query("select e from ExpenseRequest e where e.id = :id")
     Optional<ExpenseRequest> findWithRelationsById(@Param("id") Long id);
 
-    Optional<ExpenseRequest> findByTitle(String title);
 }
