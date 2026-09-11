@@ -64,7 +64,7 @@ DB接続先は環境変数で変更できます。詳細は `.env.example` を�
 
 認証、未認証アクセス、CSRF拒否、Flyway適用、申請の作成・編集・申請、承認・差戻し、権限・検索・競合・履歴ロールバックをTestcontainersのPostgreSQLで検証します。Dockerが起動していない環境ではTestcontainersテストは実行できません。
 
-GitHub Actionsの`dependency-scan` jobでは、Maven依存を解決してからTrivy 0.58.2で`pom.xml`と生成jarを走査し、JSONレポートをartifactへ保存します。アプリ依存の一括アップグレードは行いません。
+GitHub Actionsの`dependency-scan` jobでは、`./mvnw --batch-mode -DskipTests package`でSpring Bootの実行jarを生成し、CycloneDX Maven Plugin 2.9.1でcompile/runtime（推移的依存を含む）のSBOMを作成します。Trivy 0.58.2は`target/bom.json`をSBOMとして解析し、生成jarの`BOOT-INF/lib`一覧、依存ツリー、SBOMに含まれるパッケージ名・バージョンをartifactへ保存します。解析対象の欠落・空の依存一覧・脆弱性検出はCIを成功扱いにしません。アプリ依存の無関係な一括アップグレードは行いません。
 
 ## 3分デモ
 

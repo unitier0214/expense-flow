@@ -81,4 +81,7 @@
 - V2の移行処理は、旧実装の正規件名に一致する行をseedごとに最小IDへ一度だけバックフィルする。同名の旧行が複数ある場合もマーカーは1件だけにする。V2適用前にすでに改名・削除された行は、旧DBにseed識別子が存在しないため、完全な復元や判定はできない。この限界を資料に残し、V2適用後の再起動ではマーカーを唯一の判定にする。
 - 件名・用途・差戻し理由の空白処理は、ServiceとEntityでJava `String.strip()`へ統一する。`IllegalArgumentException`を一律にHTTP 400へ変換せず、Serviceの項目別入力エラーで先に検証し、Entityは直接呼び出し時にも同じ業務ルールを守る。
 - 実ブラウザ検証はローカル環境にJava 21／Docker／起動アプリがないため、CIのUbuntu runnerへChromium＋Playwrightの実DOM操作を追加し、主要フローと編集エラー復帰を検証する。curlのCompose smokeはHTTP検証として別に扱い、スクリーンショットはActions artifactへ保存する。
-- 依存脆弱性検査はアプリ依存を一括更新せず、CIでMaven依存を解決した後、Trivy 0.58.2で`pom.xml`と生成jarを走査する専用jobを追加する。JSONレポートをartifactへ保存する。OWASP Dependency-Check 13.0.0も試行したが、NVD APIキーなしでは現行APIからデータを取得できなかったため、結果の根拠には採用せず、制約を`docs/test-results.md`へ記録する。
+- 当初のTrivy filesystem scanは、`017f4e02`の[run 34614730290](https://github.com/unitier0214/expense-flow/actions/runs/34614730290)で`pom.xml`だけを解析対象として報告し、生成jarの実行時依存を確認できなかった。この結果を「pom.xmlと生成jarを走査」とは記載しない。
+- 依存検査は、`package`でSpring Boot実行jarを生成し、CycloneDX Maven Plugin 2.9.1でcompile/runtime（推移的依存を含む）のSBOMを作成してから、Trivy 0.58.2の`sbom` scanで`target/bom.json`を解析する方式へ修正した。`BOOT-INF/lib`一覧、runtime dependency tree、パッケージ名・バージョンのJSON inventoryを同じartifactへ保存し、解析対象・依存一覧・Trivy結果が欠けた場合はCIを失敗させる。
+- 初回SBOM検査では`tomcat-embed-core` 11.0.24に3件の検出（CVE-2026-65182、CVE-2026-65905、CVE-2026-68525）があったため、Spring Boot 4.1.1を維持したまま`tomcat.version`だけを11.0.25へ上書きした。Apache Tomcatの[公式セキュリティ情報](https://tomcat.apache.org/security-11.html)にある影響範囲・修正版と照合し、無関係な一括アップグレードは行わない。
+- OWASP Dependency-Check 13.0.0も試行したが、NVD APIキーなしでは現行APIからデータを取得できなかったため、結果の根拠には採用せず、制約を`docs/test-results.md`へ記録する。

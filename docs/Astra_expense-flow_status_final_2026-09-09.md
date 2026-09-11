@@ -109,9 +109,11 @@ SPRING_PROFILES_ACTIVE=demo docker compose up --build
 
 ### 対象SHAと検証結果
 
+- 今回の開始時main：[`017f4e02`](https://github.com/unitier0214/expense-flow/commit/017f4e02729894d1b7d3f0fbe8ad0bf453e8336b)。このSHAの旧filesystem scanは`pom.xml`だけが対象だった。
 - コード・V2・回帰テスト：[`6a7c357b`](https://github.com/unitier0214/expense-flow/commit/6a7c357b50582e6120bf5be581a8515b2e12e93f)。[run 34610990791](https://github.com/unitier0214/expense-flow/actions/runs/34610990791)でtest／verify／Compose smoke成功。
-- ブラウザ・Trivyを含む最終検証：[`7bb01ba1`](https://github.com/unitier0214/expense-flow/commit/7bb01ba1d56f879a1d86f417b1ae222266c7a365)。[run 34612201340](https://github.com/unitier0214/expense-flow/actions/runs/34612201340)でtest 52件、verify、Compose設定・smoke、Chromium＋Playwright smoke、Trivy検査がすべて成功。
-- ブラウザのスクリーンショット：[Actions artifact](https://github.com/unitier0214/expense-flow/actions/runs/34612201340/artifacts/10268903974)。Trivy JSON：[artifact](https://api.github.com/repos/unitier0214/expense-flow/actions/artifacts/10268932881/zip)。Trivy検出数は0件だった。
+- ブラウザを含む前回の最終検証：[`7bb01ba1`](https://github.com/unitier0214/expense-flow/commit/7bb01ba1d56f879a1d86f417b1ae222266c7a365)。この時点のfilesystem scanは後の確認で`pom.xml`だけが対象と判明したため、生成jarの依存検査の根拠にはしない。
+- 依存検査を修正した検証コミット：[`19b6836d`](https://github.com/unitier0214/expense-flow/commit/19b6836dd000d8c605e6bb6d7986010196c7a17e)。[run 34633201713](https://github.com/unitier0214/expense-flow/actions/runs/34633201713)でtest 52件、verify、Compose設定・smoke、Chromium smoke、SBOMを対象にしたTrivy検査がすべて成功した。
+- ブラウザのスクリーンショット：[Actions artifact](https://github.com/unitier0214/expense-flow/actions/runs/34612201340/artifacts/10268903974)。依存検査のJSON・SBOM・依存一覧：[dependency scan artifact](https://github.com/unitier0214/expense-flow/actions/runs/34633201713/artifacts/10277196756)。Trivyの実解析対象は`target/bom.json`（`ArtifactType=cyclonedx`、`Target=Java`、`Type=jar`）、SBOM 105件、生成jarの`BOOT-INF/lib` 92本、修正後の検出0件だった。
 
 ### 未確認事項・既知の制約
 

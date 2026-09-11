@@ -170,7 +170,7 @@ CSV実装の検証対象は [`41f90066a190dc8f0f78faba1849f4b044b19722`](https:/
 | Compose smoke | 成功。既存の作成→編集→申請→差戻し→修正・再申請→別承認者承認→詳細・履歴→ログアウト、検索条件付きCSV、保護URL拒否、DB永続化を確認 |
 | 実ブラウザ | 成功。CI上のChromium＋Playwrightでログイン、作成、編集エラーから同一IDへ復帰、訂正、申請、差戻し、再申請、別承認者の承認、ログアウト後の保護URL拒否を実DOM操作で確認 |
 | ブラウザ画面 | 成功。スクリーンショットを [browser artifact](https://github.com/unitier0214/expense-flow/actions/runs/34612201340/artifacts/10268903974) に保存（ログイン、一覧、作成詳細、編集エラー、編集後、差戻し、承認済み、ログイン復帰） |
-| 依存脆弱性検査 | 成功。Maven依存を解決してTrivy 0.58.2で`pom.xml`と生成jarを走査し、検出0件。JSONは [Trivy report artifact](https://api.github.com/repos/unitier0214/expense-flow/actions/artifacts/10268932881/zip) に保存 |
+| 依存脆弱性検査 | 旧filesystem scanは`pom.xml`だけが対象だったため根拠にしない。追加確認でSBOMを検査し、詳細は下記「依存脆弱性検査の追加確認」に記録 |
 
 ### 最終レビュー指摘への対応
 
@@ -181,16 +181,42 @@ CSV実装の検証対象は [`41f90066a190dc8f0f78faba1849f4b044b19722`](https:/
 ### 依存脆弱性検査の経緯と未解決事項
 
 - 最初にOWASP Dependency-Check Maven Plugin 13.0.0を実行したが、[run 34611756067](https://github.com/unitier0214/expense-flow/actions/runs/34611756067)では現行NVD APIが空のAPIキーを拒否し、NVDデータがないため分析を完了できなかった。これは脆弱性0件の結果として扱っていない。
-- 代替として最終CIで、`./mvnw --batch-mode -DskipTests package`後に次のTrivy走査を実行した。
+- 代替として、`./mvnw --batch-mode -DskipTests package`後にCycloneDX Maven Plugin 2.9.1でcompile/runtime（推移的依存を含む）のSBOMを生成し、次のTrivy走査を実行した。
 
   ```bash
   docker run --rm -v "$GITHUB_WORKSPACE:/src" -w /src \
     aquasec/trivy:0.58.2 \
-    fs --scanners vuln --format json --output trivy-report.json \
-    --exit-code 0 --no-progress --skip-dirs .git .
+    sbom --scanners vuln --format json --output trivy-report.json \
+    --exit-code 0 --no-progress target/bom.json
   ```
 
-- Trivyの結果は検出0件だった。スキャン時点のTrivy vulnerability DBに基づく結果であり、将来の新規脆弱性や、NVD APIキーを取得して実行するOWASPレポートを代替するものではない。アプリ依存の無関係な一括アップグレードは行っていない。
+- 旧[run 34614730290](https://github.com/unitier0214/expense-flow/actions/runs/34614730290)のTrivy JSONは`ArtifactType=filesystem`で、`Results`に`Target=pom.xml`、`Type=pom`の1件しかなく、生成jarの走査を裏付けなかった。この記録を受け、上記のSBOM検査へ修正した。
+- OWASPの試行はNVD APIキーなしのため解析を完了できず、依存解析失敗を脆弱性0件とは扱っていない。
+
+### 依存脆弱性検査の追加確認（2026-09-11）
+
+開始時に確認したmainは [`017f4e02`](https://github.com/unitier0214/expense-flow/commit/017f4e02729894d1b7d3f0fbe8ad0bf453e8336b) である。検証対象コミットは [`19b6836d`](https://github.com/unitier0214/expense-flow/commit/19b6836dd000d8c605e6bb6d7986010196c7a17e)、CIは[run 34633201713](https://github.com/unitier0214/expense-flow/actions/runs/34633201713)である。修正後のdependency-scan jobは成功し、同じrunで52テスト、verify、Compose設定・smoke、Chromium＋Playwright smokeも成功した。
+
+| 項目 | 実測結果 |
+|---|---|
+| Maven／SBOM | `./mvnw --batch-mode -DskipTests package`成功。CycloneDX 1.6、コンポーネント105件 |
+| Spring Boot生成jar | `target/expense-flow-0.1.0-SNAPSHOT.jar`。`BOOT-INF/lib`の実行時ライブラリ92本 |
+| Trivy解析対象 | `ArtifactName=target/bom.json`、`ArtifactType=cyclonedx`、`Target=Java`、`Class=lang-pkgs`、`Type=jar` |
+| パッケージ記録 | `target/runtime-dependency-inventory.json`に105件の名前・バージョン・scope・PURL、`runtime-dependencies.txt`にjar内92本、`runtime-dependency-tree.txt`にruntime依存ツリー |
+| 代表パッケージ | `spring-boot` 4.1.1、`tomcat-embed-core` 11.0.25、`postgresql` 42.7.13 |
+| 検出数 | 0件。severity counts `{}` |
+
+成果物は[expenseflow-dependency-scan artifact](https://github.com/unitier0214/expense-flow/actions/runs/34633201713/artifacts/10277196756)である。`trivy-report.json`の`Results`が空ではなくJava jar解析結果を含むこと、inventoryが空でないことをCIスクリプトでも検証しているため、解析対象なしや依存解析失敗を0件として成功扱いしない。
+
+初回のSBOM検査（[run 34632765972](https://github.com/unitier0214/expense-flow/actions/runs/34632765972)、[artifact](https://github.com/unitier0214/expense-flow/actions/runs/34632765972/artifacts/10277755317)）では、`tomcat-embed-core` 11.0.24に次の3件を検出した。検査後にSpring Boot 4.1.1を維持し、`pom.xml`の`tomcat.version`だけを11.0.25へ更新した。
+
+| 脆弱性 | パッケージ | 検出／修正版 | 影響の要約 |
+|---|---|---|---|
+| CVE-2026-65182 | `tomcat-embed-core` | 11.0.24 → 11.0.25 | 長いpath constraintの順序によるsecurity constraint bypass |
+| CVE-2026-65905 | `tomcat-embed-core` | 11.0.24 → 11.0.25 | DIGEST認証で限定的なreplayが可能 |
+| CVE-2026-68525 | `tomcat-embed-core` | 11.0.24 → 11.0.25 | FORM認証でmethod-specific constraintを迂回する可能性 |
+
+影響範囲と修正版は[Apache Tomcat 11の公式セキュリティ情報](https://tomcat.apache.org/security-11.html)と照合した。修正後の再検査では3件は再現せず、無関係な依存の一括アップグレードは行っていない。Trivyの結果は検査時点の脆弱性DBに基づくため、将来の新規脆弱性やNVD APIキー付きOWASP検査を保証するものではない。
 
 ### ブラウザとローカル環境
 

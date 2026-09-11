@@ -99,7 +99,7 @@
 - `ExpenseService`、`ExpenseRequest`、`ExpenseEvent`の空白処理を`String.strip()`へ揃え、全角スペースだけの件名・用途・差戻し理由を項目別400で拒否する回帰テストを追加した。入力不備を一律例外変換で処理する実装にはしていない。
 - `DemoDataInitializerIntegrationTest`を再初期化・同名・改名・削除まで拡張し、`DemoSeedMigrationIntegrationTest`で既存DBのV1→V2バックフィルを実PostgreSQLで検証した。
 - 実ブラウザ確認用にCIへChromium＋Playwright smokeを追加した。編集エラーから同一申請へ復帰する画面を含む主要フローを操作し、スクリーンショットをActions artifactへ保存する。
-- 依存脆弱性検査はCIの`dependency-scan` jobでMaven依存を解決後、Trivy 0.58.2のvulnerability scanを実行する。OWASP Dependency-Check 13.0.0はNVD APIキーなしでデータ取得できず失敗したため、最終判定に流用せず未解決事項として記録する。
+- 依存脆弱性検査はCIの`dependency-scan` jobでSpring Boot実行jarを生成し、compile/runtime（推移的依存を含む）のCycloneDX SBOMをTrivy 0.58.2で解析する。生成jarの`BOOT-INF/lib`一覧と、名前・バージョンを含む依存inventoryをartifactへ保存し、解析対象や依存一覧が欠けた場合は成功扱いにしない。OWASP Dependency-Check 13.0.0はNVD APIキーなしでデータ取得できず、最終判定に流用せず未解決事項として記録する。
 
 コード・マイグレーションの検証対象は [`6a7c357b`](https://github.com/unitier0214/expense-flow/commit/6a7c357b50582e6120bf5be581a8515b2e12e93f)、CI [run 34610990791](https://github.com/unitier0214/expense-flow/actions/runs/34610990791)でtest／verify／Compose smokeが成功した。ブラウザとTrivyを含む最終CIは、結果確定後にこの資料と最終引き継ぎ資料へ追記する。
 
@@ -108,6 +108,13 @@
 ### 最終レビュー検証結果の確定
 
 - ブラウザ・Trivyを含む最終検証対象は [`7bb01ba1`](https://github.com/unitier0214/expense-flow/commit/7bb01ba1d56f879a1d86f417b1ae222266c7a365)、CI [run 34612201340](https://github.com/unitier0214/expense-flow/actions/runs/34612201340)である。test 52件、verify、Compose設定・smoke、Chromium＋Playwright smoke、Trivy検査がすべて成功した。
-- 実ブラウザのスクリーンショットは [Actions artifact](https://github.com/unitier0214/expense-flow/actions/runs/34612201340/artifacts/10268903974)、Trivy JSONは [artifact](https://api.github.com/repos/unitier0214/expense-flow/actions/artifacts/10268932881/zip) に保存した。Trivy検出数は0件だった。
+- 実ブラウザのスクリーンショットは [Actions artifact](https://github.com/unitier0214/expense-flow/actions/runs/34612201340/artifacts/10268903974) に保存した。旧Trivy filesystem scanのJSONは[run 34614730290のartifact](https://github.com/unitier0214/expense-flow/actions/runs/34614730290/artifacts/10270182691)で、解析対象が`pom.xml`だけだったため、生成jarの依存検査の根拠にはしない。
 - OWASP Dependency-CheckはNVD APIキーなしでは現行APIからデータを取得できず、[run 34611756067](https://github.com/unitier0214/expense-flow/actions/runs/34611756067)を脆弱性0件とは扱っていない。代替のTrivy結果も検査時点の結果であり、将来の新規脆弱性やAPIキー付きNVD検査を保証しない。
 - V2適用前に改名・削除されたseed申請は、V1にseed識別子がないため完全には推定できない。V2適用後は永続markerを唯一の投入済み判定にする。
+
+### 依存脆弱性検査の追加確認
+
+- 開始時のmainは [`017f4e02`](https://github.com/unitier0214/expense-flow/commit/017f4e02729894d1b7d3f0fbe8ad0bf453e8336b) だった。そこから、旧filesystem scanの実対象を確認し、依存検査だけを修正した。
+- 依存検査の修正コミットは [`19b6836d`](https://github.com/unitier0214/expense-flow/commit/19b6836dd000d8c605e6bb6d7986010196c7a17e)。[CI run 34633201713](https://github.com/unitier0214/expense-flow/actions/runs/34633201713)でdependency-scan、52テスト、verify、Compose設定・smoke、Chromium smokeが成功した。
+- Trivyの実解析対象は`ArtifactName=target/bom.json`、`ArtifactType=cyclonedx`、`Target=Java`、`Class=lang-pkgs`、`Type=jar`だった。SBOMは105コンポーネント、生成jarは`target/expense-flow-0.1.0-SNAPSHOT.jar`、`BOOT-INF/lib`は92本で、artifactの`target/runtime-dependency-inventory.json`に全105パッケージの名前・バージョン・PURLを保存した。代表例は`spring-boot` 4.1.1、`tomcat-embed-core` 11.0.25、`postgresql` 42.7.13である。
+- 初回SBOM検査では`tomcat-embed-core` 11.0.24に3件が検出された。CVE-2026-65182、CVE-2026-65905、CVE-2026-68525はいずれも11.0.25で修正されるため、Tomcatのパッチプロパティだけを更新した。修正後のTrivy結果は脆弱性0件（severity counts `{}`）で、成果物は[dependency scan artifact](https://github.com/unitier0214/expense-flow/actions/runs/34633201713/artifacts/10277196756)である。
