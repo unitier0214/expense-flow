@@ -90,7 +90,7 @@ public class ExpenseService {
                 .map(this::toListItem)
                 .toList();
         return new ExpenseListPage(items, requests.getTotalElements(), requests.getTotalPages(),
-                requests.getNumber(), requests.hasPrevious(), requests.hasNext(),
+                requests.getNumber(), requests.hasPrevious(), hasNextPage(requests),
                 criteria.statusValue(), criteria.categoryValue(), criteria.fromValue(),
                 criteria.toValue(), criteria.query());
     }
@@ -110,6 +110,11 @@ public class ExpenseService {
                 .map(this::toListItem)
                 .toList();
         return toCsv(items);
+    }
+
+    private boolean hasNextPage(Page<?> page) {
+        // PageImpl.hasNext() adds one as an int, which overflows at MAX_VALUE.
+        return (long) page.getNumber() + 1 < page.getTotalPages();
     }
 
     private PageRequest ownPageRequest(int pageNumber, int pageSize) {
@@ -158,7 +163,7 @@ public class ExpenseService {
                 .map(this::toApprovalListItem)
                 .toList();
         return new ApprovalListPage(items, requests.getTotalElements(), requests.getTotalPages(),
-                requests.getNumber(), requests.hasPrevious(), requests.hasNext());
+                requests.getNumber(), requests.hasPrevious(), hasNextPage(requests));
     }
 
     @Transactional(readOnly = true)

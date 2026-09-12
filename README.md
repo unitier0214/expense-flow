@@ -123,6 +123,7 @@ GitHub Actionsの`dependency-scan` jobでは、`./mvnw --batch-mode -DskipTests 
 - [テストケース](docs/test-cases.md)
 - [テスト結果](docs/test-results.md)
 - [デモ手順](docs/demo-script.md)
+- [ブラウザ用の公開環境案](docs/browser-demo-hosting.md)
 - [学習ガイド](docs/learning-guide.md)
 - [フェーズ4現状報告](docs/Astra_expense-flow_status_phase4_2026-09-09.md)
 - [最終引き継ぎ資料](docs/Astra_expense-flow_status_final_2026-09-09.md)

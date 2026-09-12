@@ -17,4 +17,4 @@
 
 ## 公開環境
 
-現行のJava／Spring Boot、JPA、PostgreSQLをSitesのWorkers実行環境へそのまま配置することはできない。操作可能な公開デモにはJavaコンテナとPostgreSQLを稼働させる公開先が必要。外部環境へのデプロイは未実施。
+現行のJava／Spring Boot、JPA、PostgreSQLをSitesのWorkers実行環境へそのまま配置することはできない。操作可能な公開デモにはJavaコンテナとPostgreSQLを稼働させる公開先が必要。[ブラウザ用の公開環境案](browser-demo-hosting.md)にRenderの設定候補を記載した。利用アカウントとプランは未指定で、外部環境へのデプロイは未実施。
