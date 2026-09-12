@@ -31,6 +31,7 @@ import jp.example.expenseflow.feature.expense.service.dto.ApprovalForm;
 import jp.example.expenseflow.feature.expense.service.dto.ApprovalListItem;
 import jp.example.expenseflow.feature.expense.service.dto.ApprovalListPage;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -118,6 +119,13 @@ public class ExpenseService {
 
     private Page<ExpenseRequest> findOwnPage(Long applicantId, SearchCriteria criteria,
                                               PageRequest pageRequest) {
+        // JPA accepts only int offsets. A bounded first page obtains the same filtered
+        // total without passing an overflowing offset or loading all matching rows.
+        if (pageRequest.getOffset() > Integer.MAX_VALUE) {
+            long total = findOwnPage(applicantId, criteria,
+                    ownPageRequest(0, 1)).getTotalElements();
+            return new PageImpl<>(List.of(), pageRequest, total);
+        }
         return criteria.query() == null
                 ? expenseRequestRepository.findOwnPageWithoutQuery(
                         applicantId, criteria.status(), criteria.category(), criteria.fromDate(),
@@ -136,8 +144,16 @@ public class ExpenseService {
         requireApprover(currentUser);
         PageRequest pageRequest = PageRequest.of(pageNumber, PAGE_SIZE,
                 Sort.by(Sort.Order.asc("submittedAt"), Sort.Order.asc("id")));
-        Page<ExpenseRequest> requests = expenseRequestRepository.findApprovalPage(
-                currentUser.departmentId(), currentUser.id(), ExpenseStatus.SUBMITTED, pageRequest);
+        Page<ExpenseRequest> requests;
+        if (pageRequest.getOffset() > Integer.MAX_VALUE) {
+            long total = expenseRequestRepository.findApprovalPage(
+                    currentUser.departmentId(), currentUser.id(), ExpenseStatus.SUBMITTED,
+                    PageRequest.of(0, 1, pageRequest.getSort())).getTotalElements();
+            requests = new PageImpl<>(List.of(), pageRequest, total);
+        } else {
+            requests = expenseRequestRepository.findApprovalPage(
+                    currentUser.departmentId(), currentUser.id(), ExpenseStatus.SUBMITTED, pageRequest);
+        }
         List<ApprovalListItem> items = requests.getContent().stream()
                 .map(this::toApprovalListItem)
                 .toList();

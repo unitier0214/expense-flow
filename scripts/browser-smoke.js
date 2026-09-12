@@ -48,6 +48,15 @@ async function run() {
     ]);
     await screenshot(page, '02-expenses-list.png');
 
+    currentStep = 'mobile-list';
+    await page.setViewportSize({ width: 375, height: 812 });
+    await expectText(page.locator('#page-title'), '経費申請');
+    const horizontalOverflow = await page.evaluate(() =>
+      document.documentElement.scrollWidth > window.innerWidth);
+    if (horizontalOverflow) throw new Error('mobile page overflows the viewport');
+    await screenshot(page, '09-mobile-list.png');
+    await page.setViewportSize({ width: 1280, height: 720 });
+
     currentStep = 'create';
     await page.getByRole('link', { name: '新規申請' }).click();
     const title = `ブラウザ確認-${Date.now()}`;
@@ -145,6 +154,14 @@ async function run() {
       throw new Error(`protected URL was accessible after logout: ${page.url()}`);
     }
     await screenshot(page, '08-login-after-logout.png');
+    fs.writeFileSync(path.join(screenshotDirectory, 'source.json'), JSON.stringify({
+      sourceSha: process.env.SOURCE_SHA || 'local-unrecorded',
+      ciRun: process.env.GITHUB_RUN_ID
+        ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
+        : null,
+      browser: 'Chromium / Playwright 1.55.0',
+      mobileViewport: { width: 375, height: 812 },
+    }, null, 2) + '\n');
   } catch (error) {
     await page.screenshot({
       path: path.join(screenshotDirectory, 'failure.png'),

@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-09-12 最終総合レビュー修正
+
+R1〜R6の修正と回帰テストを追加。新しい変更のCI検証は進行中。過去の成功結果を今回の合格根拠にはしない。最新の対象・結果は [最終修正報告](final-review-2026-09-12.md) を参照。
+
 ## フェーズ2：社員の申請機能
 
 ### フェーズ2レビュー修正（2026-09-09）
@@ -118,3 +122,4 @@
 - 依存検査の修正コミットは [`19b6836d`](https://github.com/unitier0214/expense-flow/commit/19b6836dd000d8c605e6bb6d7986010196c7a17e)。[CI run 34633201713](https://github.com/unitier0214/expense-flow/actions/runs/34633201713)でdependency-scan、52テスト、verify、Compose設定・smoke、Chromium smokeが成功した。
 - Trivyの実解析対象は`ArtifactName=target/bom.json`、`ArtifactType=cyclonedx`、`Target=Java`、`Class=lang-pkgs`、`Type=jar`だった。SBOMは105コンポーネント、生成jarは`target/expense-flow-0.1.0-SNAPSHOT.jar`、`BOOT-INF/lib`は92本で、artifactの`target/runtime-dependency-inventory.json`に全105パッケージの名前・バージョン・PURLを保存した。代表例は`spring-boot` 4.1.1、`tomcat-embed-core` 11.0.25、`postgresql` 42.7.13である。
 - 初回SBOM検査では`tomcat-embed-core` 11.0.24に3件が検出された。CVE-2026-65182、CVE-2026-65905、CVE-2026-68525はいずれも11.0.25で修正されるため、Tomcatのパッチプロパティだけを更新した。修正後のTrivy結果は脆弱性0件（severity counts `{}`）で、成果物は[dependency scan artifact](https://github.com/unitier0214/expense-flow/actions/runs/34633201713/artifacts/10277196756)である。
+

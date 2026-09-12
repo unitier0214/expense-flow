@@ -1,3 +1,5 @@
+> 過去時点の記録です。最新の状態は [2026-09-12 最終修正報告](final-review-2026-09-12.md) と [テスト結果](test-results.md) を参照してください。
+
 # ExpenseFlow 現状報告（Astra引き継ぎ用）
 
 作成日：2026-09-09  
@@ -73,3 +75,4 @@
 - テストケース：[`docs/test-cases.md`](test-cases.md)
 - テスト結果：[`docs/test-results.md`](test-results.md)
 - デモ手順：[`docs/demo-script.md`](demo-script.md)
+

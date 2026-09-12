@@ -38,9 +38,9 @@ Entityの状態変更は一般的なsetterではなく、`updateDetails`、`subm
 
 ## 認証・認可・CSRF
 
-`src/main/java/jp/example/expenseflow/config/SecurityConfig.java` でフォームログイン、保護URL、CSRF、POSTログアウトを設定しています。ログインはSpring Securityが処理するため302、経費の成功POSTはControllerのPRGで303です。
+`src/main/java/jp/example/expenseflow/feature/auth/config/SecurityConfig.java` でフォームログイン、保護URL、CSRF、POSTログアウトを設定しています。ログインはSpring Securityが処理するため302、経費の成功POSTはControllerのPRGで303です。
 
-認証は「誰か」を確認し、認可は「その申請を操作してよいか」を確認します。`ExpenseService.requireOwned` は申請者本人だけの変更操作を許可し、`requireApprovalTarget` は同部署・本人以外・SUBMITTEDの承認対象だけを許可します。画面からボタンを隠すだけではなく、URLを直接呼んでもServiceで拒否します。存在を知らせない対象は404、社員の承認操作は403、見えるが状態が違う操作は409です。
+認証は「誰か」を確認し、認可は「その申請を操作してよいか」を確認します。`ExpenseService.requireOwned` は申請者本人だけの変更操作を許可します。`requireApprover` によるロール確認後、`requireApprovalTarget` は同部署・本人以外・DRAFT以外という対象へのアクセスを検証し、`approve`／`returnToApplicant` がSUBMITTEDからだけ遷移できることを検証します。画面からボタンを隠すだけではなく、URLを直接呼んでもServiceで拒否します。存在を知らせない対象は404、社員の承認操作は403、見えるが状態が違う操作は409です。
 
 CSRFは、別サイトからログイン済みブラウザを使ってPOSTされることを防ぐ仕組みです。フォームのhidden `_csrf` を削除したテストは403になります。これは申請の所有者チェックとは別の防御です。
 
@@ -75,7 +75,7 @@ CSRFは、別サイトからログイン済みブラウザを使ってPOSTされ
 
 ## AI支援と自分で確認する範囲
 
-この開発では、AI支援を設計の読み解き、実装案、テスト観点、資料の下書きに利用しました。生成されたコードを無条件に採用したという説明はしません。実際に説明する際は、次の点を自分でファイルとテスト結果に照らして確認してください。
+この開発では、設計・レビュー、コード実装、テスト作成・実行、資料作成にAI支援を利用しました。本人の理解度や未実施の検証をAIの作業結果から推定せず、実際に説明する前に次の点を自分でファイルとテスト結果に照らして確認してください。
 
 - なぜForm DTOからEntityへ直接バインドしないのか。
 - `requireOwned` と `requireApprovalTarget` の判定順、403/404/409の違い。

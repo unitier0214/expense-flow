@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -15,6 +17,8 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.time.ZoneId;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.List;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
@@ -35,6 +39,7 @@ import jp.example.expenseflow.feature.expense.repository.ExpenseEventRepository;
 import jp.example.expenseflow.feature.expense.repository.ExpenseRequestRepository;
 import jp.example.expenseflow.feature.expense.service.ExpenseService;
 import jp.example.expenseflow.feature.expense.service.dto.ExpenseForm;
+import jp.example.expenseflow.feature.expense.service.dto.ExpenseListPage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -104,6 +109,9 @@ class ExpenseIntegrationTest {
     @Autowired
     PlatformTransactionManager transactionManager;
 
+    @Autowired
+    MutableTestClock testClock;
+
     private Department sales;
     private Department development;
     private AppUser employee;
@@ -114,6 +122,7 @@ class ExpenseIntegrationTest {
 
     @BeforeEach
     void setUpUsers() {
+        testClock.setInstant(FIXED_INSTANT);
         expenseEventRepository.deleteAllInBatch();
         expenseRequestRepository.deleteAllInBatch();
         appUserRepository.deleteAllInBatch();
@@ -359,6 +368,92 @@ class ExpenseIntegrationTest {
         assertThat(findRequest(minimumId).getPurpose()).hasSize(500);
         assertThat(findRequest(minimumId).getAmount()).isEqualByComparingTo("1");
         assertThat(findRequest(maximumId).getAmount()).isEqualByComparingTo("1000000");
+    }
+
+    @Test
+    void overlongTitleAndPurposeAreRejectedForCreateAndEditWithoutChangingData() throws Exception {
+        MockHttpSession session = loginAs(employee.getUsername());
+        Long id = createViaHttp(session, "変更前", "変更前の用途", "OTHER", "2026-09-09", "100");
+        for (String field : List.of("title", "purpose")) {
+            for (String endpoint : List.of("/expenses", "/expenses/" + id + "/edit")) {
+                mockMvc.perform(post(endpoint).session(session).with(csrf())
+                                .param("title", field.equals("title") ? "a".repeat(101) : "変更後")
+                                .param("purpose", field.equals("purpose") ? "b".repeat(501) : "変更後の用途")
+                                .param("category", "OTHER").param("expenseDate", "2026-09-09")
+                                .param("amount", "100").param("version", "0"))
+                        .andExpect(status().isBadRequest());
+                assertThat(expenseRequestRepository.count()).isEqualTo(1);
+                ExpenseRequest unchanged = findRequest(id);
+                assertThat(unchanged.getTitle()).isEqualTo("変更前");
+                assertThat(unchanged.getPurpose()).isEqualTo("変更前の用途");
+                assertThat(unchanged.getVersion()).isZero();
+                assertThat(expenseEventRepository.findByExpenseIdForDisplay(id)).hasSize(1);
+            }
+        }
+    }
+
+    @Test
+    void sameExpenseDateChangesFromFutureToTodayAtJstMidnight() throws Exception {
+        MockHttpSession session = loginAs(employee.getUsername());
+        testClock.setInstant(FIXED_INSTANT.minusSeconds(1)); // JST 2026-09-08 23:59:59
+        mockMvc.perform(post("/expenses").session(session).with(csrf())
+                        .param("title", "日付境界").param("purpose", "境界確認")
+                        .param("category", "OTHER").param("expenseDate", "2026-09-09")
+                        .param("amount", "100"))
+                .andExpect(status().isBadRequest());
+        assertThat(expenseRequestRepository.count()).isZero();
+        assertThat(expenseEventRepository.count()).isZero();
+        testClock.setInstant(FIXED_INSTANT); // JST 2026-09-09 00:00:00
+        Long id = createViaHttp(session, "日付境界", "境界確認", "OTHER", "2026-09-09", "100");
+        assertThat(findRequest(id).getExpenseDate()).isEqualTo(LocalDate.of(2026, 9, 9));
+        assertThat(expenseEventRepository.findByExpenseIdForDisplay(id)).hasSize(1);
+    }
+
+    @Test
+    void mvcClientErrorsKeepStatusAndAllowHeader() throws Exception {
+        mockMvc.perform(get("/css/missing.css"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("照合ID"))));
+        mockMvc.perform(put("/expenses").session(loginAs(employee.getUsername())).with(csrf()))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(header().string("Allow", org.hamcrest.Matchers.containsString("GET")))
+                .andExpect(header().string("Allow", org.hamcrest.Matchers.containsString("POST")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("Exception"))));
+    }
+
+    @Test
+    void hugePagesKeepOwnFiltersTotalsAndPositiveDisplayNumber() throws Exception {
+        for (int index = 0; index < 21; index++) {
+            insertStatusFixture(ExpenseStatus.DRAFT);
+        }
+        insertStatusFixture(ExpenseStatus.RETURNED);
+        createViaHttp(loginAs(developmentEmployee.getUsername()), "fixture-DRAFT", "他部署",
+                "OTHER", "2026-09-08", "100");
+        MockHttpSession session = loginAs(employee.getUsername());
+        for (int number : List.of(10, 107374182, 107374183, Integer.MAX_VALUE)) {
+            for (boolean filtered : List.of(false, true)) {
+                var request = get("/expenses").session(session).param("page", Integer.toString(number));
+                if (filtered) {
+                    request.param("status", "DRAFT").param("category", "OTHER")
+                            .param("from", "2026-09-08").param("to", "2026-09-08")
+                            .param("q", "fixture-DRAFT");
+                }
+                MvcResult result = mockMvc.perform(request).andExpect(status().isOk())
+                        .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                                ((long) number + 1) + " / 2"))).andReturn();
+                ExpenseListPage page = (ExpenseListPage) result.getModelAndView().getModel().get("page");
+                assertThat(page.getItems()).isEmpty();
+                assertThat(page.getTotalElements()).isEqualTo(filtered ? 21 : 22);
+                assertThat(page.getNumber()).isEqualTo(number);
+                assertThat(page.isHasNext()).isFalse();
+                if (filtered) {
+                    assertThat(page.getQ()).isEqualTo("fixture-DRAFT");
+                    assertThat(result.getResponse().getContentAsString()).contains("q=fixture-DRAFT");
+                }
+            }
+        }
     }
 
     @Test
@@ -939,8 +1034,37 @@ class ExpenseIntegrationTest {
 
         @Bean
         @org.springframework.context.annotation.Primary
-        Clock fixedClock() {
-            return Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC);
+        MutableTestClock fixedClock() {
+            return new MutableTestClock(new AtomicReference<>(FIXED_INSTANT), ZoneOffset.UTC);
+        }
+    }
+
+    static final class MutableTestClock extends Clock {
+        private final AtomicReference<Instant> instant;
+        private final ZoneId zone;
+
+        MutableTestClock(AtomicReference<Instant> instant, ZoneId zone) {
+            this.instant = instant;
+            this.zone = zone;
+        }
+
+        void setInstant(Instant value) {
+            instant.set(value);
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return zone;
+        }
+
+        @Override
+        public Clock withZone(ZoneId value) {
+            return new MutableTestClock(instant, value);
+        }
+
+        @Override
+        public Instant instant() {
+            return instant.get();
         }
     }
 }

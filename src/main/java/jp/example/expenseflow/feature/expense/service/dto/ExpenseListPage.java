@@ -48,6 +48,10 @@ public class ExpenseListPage {
         return number;
     }
 
+    public long getDisplayNumber() {
+        return (long) number + 1;
+    }
+
     public boolean isHasPrevious() {
         return hasPrevious;
     }
