@@ -2,7 +2,7 @@
 
 ## 2026-09-12 最終総合レビュー修正
 
-R1〜R6の修正と回帰テストを追加。新しい変更のCI検証は進行中。過去の成功結果を今回の合格根拠にはしない。最新の対象・結果は [最終修正報告](final-review-2026-09-12.md) を参照。
+R1〜R6を修正。実装検証対象は`b9ca840a6d29692aa4bca281c9ed1f0d527f1ace`、[CI run 34681842105](https://github.com/unitier0214/expense-flow/actions/runs/34681842105)はsuccess。test／verify各57件、失敗・エラー・スキップ0。Compose、Chromium、Maven起動、SBOM検査も成功し、掲載画像5枚を目視した。画像掲載・結果追記後のCIと未確認範囲は [最終修正報告](final-review-2026-09-12.md) と [PR #1](https://github.com/unitier0214/expense-flow/pull/1) を参照。
 
 ## 2026-09-09（フェーズ2完了確認）
 

@@ -29,6 +29,18 @@ CSVは本人の検索条件を引き継ぎ、`updated_at DESC, id DESC`で全該
 
 demoプロファイルの45件は、変更可能な件名ではなくV2で追加した永続seed marker（`expense-01`〜`expense-45`）で投入済み判定を行います。件名変更・同名申請・seed下書き削除後の再起動でも、既存データを復活・増殖させません。V1は変更せず、既存DBの正規件名はV2適用時に一度だけmarkerへ移行します。
 
+## 実際のデモ画面
+
+Chromiumでアプリを操作して取得した画面です。画像を開くと拡大できます。
+
+| 本人の申請一覧 | 編集時の入力エラー |
+|---|---|
+| ![本人の申請一覧と検索](docs/images/expenses-list.png) | ![小数金額の入力エラー](docs/images/edit-validation-error.png) |
+| 差戻し理由と履歴 | 承認済みの状態と履歴 |
+| ![差戻しの詳細](docs/images/returned-detail.png) | ![承認済みの履歴](docs/images/approved-history.png) |
+
+[375px幅の一覧](docs/images/mobile-list.png) / [画像の取得元と確認範囲](docs/images/README.md)
+
 ## 起動手順
 
 ### Docker Composeでデモを試す（推奨）

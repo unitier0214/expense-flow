@@ -1,0 +1,9 @@
+{
+  "sourceSha": "b9ca840a6d29692aa4bca281c9ed1f0d527f1ace",
+  "ciRun": "https://github.com/unitier0214/expense-flow/actions/runs/34681842105",
+  "browser": "Chromium / Playwright 1.55.0",
+  "mobileViewport": {
+    "width": 375,
+    "height": 812
+  }
+}

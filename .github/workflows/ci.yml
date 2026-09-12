@@ -360,14 +360,6 @@ jobs:
           path: test-results/browser/
           if-no-files-found: warn
 
-      - name: Export screenshots for documentation review
-        run: |
-          python3 - <<'PY'
-          import base64, json, pathlib
-          root = pathlib.Path('test-results/browser')
-          for name in ['02-expenses-list.png', '04-edit-validation-error.png', '06-returned-detail.png', '07-approved-detail.png', '09-mobile-list.png', 'source.json']:
-              print('README_IMAGE ' + json.dumps({'name': name, 'data': base64.b64encode((root / name).read_bytes()).decode()}))
-          PY
 
   dependency-scan:
     runs-on: ubuntu-latest
