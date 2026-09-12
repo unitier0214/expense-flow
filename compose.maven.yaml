@@ -1,0 +1,5 @@
+# Optional host access for running Spring Boot with Maven (standard Compose keeps DB private).
+services:
+  db:
+    ports:
+      - "127.0.0.1:${DB_PORT:-5432}:5432"

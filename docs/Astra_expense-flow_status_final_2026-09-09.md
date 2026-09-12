@@ -1,3 +1,5 @@
+> 過去時点の記録です。最新の状態は [2026-09-12 最終修正報告](final-review-2026-09-12.md) と [テスト結果](test-results.md) を参照してください。
+
 # ExpenseFlow 最終現状報告（2026-09-09）
 
 ## 判定対象
@@ -122,3 +124,4 @@ SPRING_PROFILES_ACTIVE=demo docker compose up --build
 - V2適用前に旧実装上ですでに改名・削除されたseed申請は、V1にseed識別子がないため完全には推定できない。V2適用後は永続markerを唯一の投入済み判定にする。
 
 最終的な合否判定はAstraに委ねる。Astraによる確認済み・合格済みとは記載していない。
+

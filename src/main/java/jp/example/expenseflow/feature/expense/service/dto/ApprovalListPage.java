@@ -37,6 +37,10 @@ public class ApprovalListPage {
         return number;
     }
 
+    public long getDisplayNumber() {
+        return (long) number + 1;
+    }
+
     public boolean isHasPrevious() {
         return hasPrevious;
     }

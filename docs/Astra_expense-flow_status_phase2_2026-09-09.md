@@ -1,3 +1,5 @@
+> 過去時点の記録です。最新の状態は [2026-09-12 最終修正報告](final-review-2026-09-12.md) と [テスト結果](test-results.md) を参照してください。
+
 # ExpenseFlow フェーズ2現状報告（Astra提出用）
 
 作成日：2026-09-09
@@ -62,3 +64,4 @@ Controller / Form DTO / Service / Repository / Entityを分離し、認証userna
 - フェーズ3：承認待ち一覧、同部署別承認者による承認、理由付き差戻し、自己承認防止、承認／差戻し競合、CSV出力。
 
 テストの無効化・スキップ、H2やモックDBへの置換、Java／Spring Bootのダウングレード、force pushや履歴書き換えは行っていない。
+

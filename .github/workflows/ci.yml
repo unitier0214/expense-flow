@@ -20,7 +20,16 @@ jobs:
       - name: Validate Docker Compose configuration
         env:
           POSTGRES_PASSWORD: ci-password
-        run: docker compose config --quiet
+        run: |
+          docker compose config --format json > /tmp/expenseflow-compose.json
+          python3 - <<'PY'
+          import json
+          services = json.load(open('/tmp/expenseflow-compose.json'))['services']
+          assert all(p['host_ip'] == '127.0.0.1' for p in services['app']['ports'])
+          assert not services['db'].get('ports')
+          print('Compose: application bound to localhost, DB not published')
+          PY
+          docker compose -f compose.yaml -f compose.maven.yaml config --quiet
       - name: Run demo Compose smoke test
         env:
           POSTGRES_PASSWORD: ci-password
@@ -338,7 +347,11 @@ jobs:
           playwright_dir=$(mktemp -d)
           npm install --prefix "$playwright_dir" --no-package-lock playwright@1.55.0
           "$playwright_dir/node_modules/.bin/playwright" install --with-deps chromium
-          NODE_PATH="$playwright_dir/node_modules" node scripts/browser-smoke.js
+          SOURCE_SHA="$(git rev-parse HEAD)" NODE_PATH="$playwright_dir/node_modules" node scripts/browser-smoke.js
+      - name: Validate README Maven startup
+        env:
+          POSTGRES_PASSWORD: ci-password
+        run: bash scripts/maven-smoke.sh
       - name: Upload browser screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -346,6 +359,7 @@ jobs:
           name: expenseflow-browser-screenshots
           path: test-results/browser/
           if-no-files-found: warn
+
 
   dependency-scan:
     runs-on: ubuntu-latest
@@ -432,6 +446,7 @@ jobs:
                   component.get("version"),
                   component.get("scope"),
               )
+          PY
       - name: Run Trivy dependency vulnerability scan
         run: |
           docker run --rm \

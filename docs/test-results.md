@@ -1,5 +1,9 @@
 # Test Results
 
+## 2026-09-12 最終総合レビュー修正
+
+R1〜R6を修正。実装検証対象は`b9ca840a6d29692aa4bca281c9ed1f0d527f1ace`、[CI run 34681842105](https://github.com/unitier0214/expense-flow/actions/runs/34681842105)はsuccess。test／verify各57件、失敗・エラー・スキップ0。Compose、Chromium、Maven起動、SBOM検査も成功し、掲載画像5枚を目視した。画像掲載・結果追記後のCIと未確認範囲は [最終修正報告](final-review-2026-09-12.md) と [PR #1](https://github.com/unitier0214/expense-flow/pull/1) を参照。
+
 ## 2026-09-09（フェーズ2完了確認）
 
 ### 実行環境
@@ -225,3 +229,4 @@ CSV実装の検証対象は [`41f90066a190dc8f0f78faba1849f4b044b19722`](https:/
 - V2適用前に旧実装上ですでに改名・削除されたseed申請は、V1にseed識別子がないため完全には推測できない。V2は既存の正規件名を安全にバックフィルし、V2適用後は永続markerで再作成を防ぐ設計とした。
 
 テストの無効化・スキップ、H2やモックDBへの置換、Java 17への変更、CSRF無効化、V1の書き換え、実運用秘密情報のコミットは行っていない。
+

@@ -160,6 +160,24 @@ class ApprovalIntegrationTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("承認待ち21")))
                 .andExpect(content().string(org.hamcrest.Matchers.not(
                         org.hamcrest.Matchers.containsString("承認待ち01"))));
+
+        for (int number : List.of(10, 107374182, 107374183, Integer.MAX_VALUE)) {
+            MvcResult result = mockMvc.perform(get("/approvals").session(session)
+                            .param("page", Integer.toString(number)))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                            ((long) number + 1) + " / 2"))).andReturn();
+            var page = (jp.example.expenseflow.feature.expense.service.dto.ApprovalListPage)
+                    result.getModelAndView().getModel().get("page");
+            assertThat(page.getItems()).isEmpty();
+            assertThat(page.getTotalElements()).isEqualTo(21);
+            assertThat(page.getNumber()).isEqualTo(number);
+            assertThat(page.isHasNext()).isFalse();
+        }
+        for (String invalidPage : List.of("-1", "not-a-number")) {
+            mockMvc.perform(get("/approvals").session(session).param("page", invalidPage))
+                    .andExpect(status().isBadRequest());
+        }
     }
 
     @Test
@@ -168,6 +186,8 @@ class ApprovalIntegrationTest {
         MockHttpSession session = loginAs(employee.getUsername());
 
         mockMvc.perform(get("/approvals").session(session))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/approvals").session(session).param("page", "2147483647"))
                 .andExpect(status().isForbidden());
         mockMvc.perform(post("/expenses/{id}/approve", id)
                         .session(session)
@@ -368,6 +388,29 @@ class ApprovalIntegrationTest {
         assertThat(unchanged.getStatus()).isEqualTo(ExpenseStatus.SUBMITTED);
         assertThat(unchanged.getVersion()).isEqualTo(0L);
         assertThat(expenseEventRepository.findByExpenseIdForDisplay(id)).hasSize(2);
+    }
+
+    @Test
+    void returnEventFailureRollsBackStatusVersionAndHistory() throws Exception {
+        Long id = insertSubmittedFixture("差戻しロールバック", employee, FIXED_INSTANT);
+        installFailingApprovalTrigger();
+        try {
+            mockMvc.perform(post("/expenses/{id}/return", id)
+                            .session(loginAs(approver.getUsername())).with(csrf())
+                            .param("version", "0").param("comment", "保存に失敗する差戻し理由"))
+                    .andExpect(status().isInternalServerError())
+                    .andExpect(content().string(org.hamcrest.Matchers.containsString("照合ID")))
+                    .andExpect(content().string(org.hamcrest.Matchers.not(
+                            org.hamcrest.Matchers.containsString("test approval event failure"))));
+        } finally {
+            removeFailureTrigger();
+        }
+        ExpenseRequest unchanged = findRequest(id);
+        assertThat(unchanged.getStatus()).isEqualTo(ExpenseStatus.SUBMITTED);
+        assertThat(unchanged.getVersion()).isZero();
+        assertThat(expenseEventRepository.findByExpenseIdForDisplay(id))
+                .extracting(ExpenseEvent::getAction)
+                .containsExactly(ExpenseEventAction.CREATE, ExpenseEventAction.SUBMIT);
     }
 
     @Test

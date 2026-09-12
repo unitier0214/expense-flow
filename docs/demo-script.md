@@ -4,8 +4,8 @@
 
 ## 起動
 
-1. `.env.example`を`.env`へコピーし、`POSTGRES_PASSWORD`を設定する。
-2. `SPRING_PROFILES_ACTIVE=demo docker compose up --build`を実行する。
+1. [READMEの起動手順](../README.md#起動手順)に従い、`.env`に`POSTGRES_PASSWORD`と`SPRING_PROFILES_ACTIVE=demo`を設定する。
+2. `docker compose up -d --build --wait`を実行する。
 3. `/login`を開く。demo初回起動では営業部・開発部、5ユーザー、状態を分散した申請45件と履歴が冪等投入される。投入済み判定はV2の`expense-01`〜`expense-45` markerで行うため、件名変更や下書き削除後の再起動でも申請を復活させない。
 
 ## 3分デモ
@@ -17,7 +17,7 @@
 5. ログアウトし、`demo.approver.sales.1` / `demo-password`でログインする。「承認待ち」で本人以外・同部署・申請中だけが表示されることを示す。対象を開くと詳細・履歴と承認／差戻しフォームが表示される。
 6. 差戻し理由を入力して差し戻す。`demo.employee`で再ログインし、理由が履歴に残ったRETURNED申請を確認する。編集して再申請すると、直近申請日時が更新され、SUBMIT履歴が増える。
 7. `demo.approver.sales.2` / `demo-password`でログインし、承認待ちから対象を開いて任意コメント付きで承認する。詳細の状態がAPPROVED（承認済み）になり、承認コメントと履歴が表示されることを確認する。
-8. 社員へ戻り、一覧の検索条件を設定する。検索条件がCSVボタンのURLへ保持され、CSVを開くとUTF-8 BOM、日本語ヘッダー、状態ラベル、JST日時、対象行が出力されることを確認する。CSVは最大1,000件であることも説明する。
+8. ログアウトして`demo.employee`へ再ログインし、一覧の検索条件を設定する。検索条件がCSVボタンのURLへ保持され、CSVを開くとUTF-8 BOM、日本語ヘッダー、状態ラベル、JST日時、対象行が出力されることを確認する。CSVは最大1,000件であることも説明する。
 9. POSTログアウト後に`/expenses`へアクセスし、ログイン画面へ302リダイレクトされることを示す。Composeを停止・再起動（ボリューム削除なし）して、DBの申請とデモデータが残ることを確認する。
 
 ## デモ用ユーザー

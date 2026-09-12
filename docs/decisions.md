@@ -85,3 +85,13 @@
 - 依存検査は、`package`でSpring Boot実行jarを生成し、CycloneDX Maven Plugin 2.9.1でcompile/runtime（推移的依存を含む）のSBOMを作成してから、Trivy 0.58.2の`sbom` scanで`target/bom.json`を解析する方式へ修正した。`BOOT-INF/lib`一覧、runtime dependency tree、パッケージ名・バージョンのJSON inventoryを同じartifactへ保存し、解析対象・依存一覧・Trivy結果が欠けた場合はCIを失敗させる。
 - 初回SBOM検査では`tomcat-embed-core` 11.0.24に3件の検出（CVE-2026-65182、CVE-2026-65905、CVE-2026-68525）があったため、Spring Boot 4.1.1を維持したまま`tomcat.version`だけを11.0.25へ上書きした。Apache Tomcatの[公式セキュリティ情報](https://tomcat.apache.org/security-11.html)にある影響範囲・修正版と照合し、無関係な一括アップグレードは行わない。
 - OWASP Dependency-Check 13.0.0も試行したが、NVD APIキーなしでは現行APIからデータを取得できなかったため、結果の根拠には採用せず、制約を`docs/test-results.md`へ記録する。
+
+
+
+## 2026-09-12 最終総合レビュー修正
+
+- 標準Composeはアプリを127.0.0.1に限定し、DBは非公開。ホストMaven用のDB公開を任意の`compose.maven.yaml`へ分離する。Mavenのアプリは8081を使い、`.env`とSpring Bootの環境変数を明示的に区別する。
+- JPAのint offsetを超えるpageは、同じ本人・検索／承認条件の先頭1件ページで件数を取得し、要求ページ番号と総件数を持つ空ページを返す。全件取得や認可を省略する早期returnは行わない。ページ表示にはlong加算を使う。
+- Spring MVCの`ErrorResponse`が持つ4xx statusとHTTPヘッダーを維持し、画面には固定メッセージを出す。想定外の例外は従来どおり500・照合IDとし、DB例外を入力エラーに置き換えない。
+- 回帰テストは実PostgreSQLを維持し、RETURN履歴失敗・101/501文字・JST境界直前/直後・巨大page・MVC 404/405を追加する。Clockはテスト専用の差替えを行い、システム時計は操作しない。
+- 実ブラウザ画像には撮影したソースSHA・CI URLを添え、READMEから閲覧できる画像をリポジトリにも保存する。375px幅のChromium検証と画像確認を、実機の手操作確認とは区別する。

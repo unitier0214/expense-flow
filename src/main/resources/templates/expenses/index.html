@@ -102,7 +102,7 @@
         <nav th:if="${page.totalPages > 1}" class="pagination" aria-label="ページ移動">
             <a th:if="${page.hasPrevious}"
                th:href="@{/expenses(page=${page.number - 1},status=${page.status},category=${page.category},from=${page.from},to=${page.to},q=${page.q})}">前へ</a>
-            <span th:text="|${page.number + 1} / ${page.totalPages}|">1 / 1</span>
+            <span th:text="|${page.displayNumber} / ${page.totalPages}|">1 / 1</span>
             <a th:if="${page.hasNext}"
                th:href="@{/expenses(page=${page.number + 1},status=${page.status},category=${page.category},from=${page.from},to=${page.to},q=${page.q})}">次へ</a>
         </nav>

@@ -1,6 +1,7 @@
 package jp.example.expenseflow.feature.expense.web;
 
 import java.util.UUID;
+import jakarta.servlet.http.HttpServletResponse;
 import jp.example.expenseflow.feature.expense.service.ExpenseConflictException;
 import jp.example.expenseflow.feature.expense.service.ExpenseExportLimitException;
 import jp.example.expenseflow.feature.expense.service.ExpenseForbiddenException;
@@ -12,11 +13,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -89,14 +92,20 @@ public class ExpenseExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public ModelAndView unexpected(Exception exception) {
+    public ModelAndView unexpected(Exception exception, HttpServletResponse response) {
+        if (exception instanceof ErrorResponse httpError && httpError.getStatusCode().is4xxClientError()) {
+            httpError.getHeaders().forEach((name, values) ->
+                    values.forEach(value -> response.addHeader(name, value)));
+            return error(httpError.getStatusCode(), "リクエストを処理できません",
+                    "指定されたページまたは操作を確認してください。", "/expenses", null);
+        }
         String correlationId = UUID.randomUUID().toString();
         logger.error("Unexpected error correlationId={}", correlationId, exception);
         return error(HttpStatus.INTERNAL_SERVER_ERROR, "エラーが発生しました",
                 "処理に失敗しました。時間をおいて再試行してください。", "/expenses", correlationId);
     }
 
-    private ModelAndView error(HttpStatus status, String heading, String message,
+    private ModelAndView error(HttpStatusCode status, String heading, String message,
                                String backUrl, String correlationId) {
         ModelAndView model = new ModelAndView("expenses/error");
         model.setStatus(status);

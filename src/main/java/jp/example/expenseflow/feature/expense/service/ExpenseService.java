@@ -31,6 +31,7 @@ import jp.example.expenseflow.feature.expense.service.dto.ApprovalForm;
 import jp.example.expenseflow.feature.expense.service.dto.ApprovalListItem;
 import jp.example.expenseflow.feature.expense.service.dto.ApprovalListPage;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -89,7 +90,7 @@ public class ExpenseService {
                 .map(this::toListItem)
                 .toList();
         return new ExpenseListPage(items, requests.getTotalElements(), requests.getTotalPages(),
-                requests.getNumber(), requests.hasPrevious(), requests.hasNext(),
+                requests.getNumber(), requests.hasPrevious(), hasNextPage(requests),
                 criteria.statusValue(), criteria.categoryValue(), criteria.fromValue(),
                 criteria.toValue(), criteria.query());
     }
@@ -111,6 +112,11 @@ public class ExpenseService {
         return toCsv(items);
     }
 
+    private boolean hasNextPage(Page<?> page) {
+        // PageImpl.hasNext() adds one as an int, which overflows at MAX_VALUE.
+        return (long) page.getNumber() + 1 < page.getTotalPages();
+    }
+
     private PageRequest ownPageRequest(int pageNumber, int pageSize) {
         return PageRequest.of(pageNumber, pageSize,
                 Sort.by(Sort.Order.desc("updatedAt"), Sort.Order.desc("id")));
@@ -118,6 +124,13 @@ public class ExpenseService {
 
     private Page<ExpenseRequest> findOwnPage(Long applicantId, SearchCriteria criteria,
                                               PageRequest pageRequest) {
+        // JPA accepts only int offsets. A bounded first page obtains the same filtered
+        // total without passing an overflowing offset or loading all matching rows.
+        if (pageRequest.getOffset() > Integer.MAX_VALUE) {
+            long total = findOwnPage(applicantId, criteria,
+                    ownPageRequest(0, 1)).getTotalElements();
+            return new PageImpl<>(List.of(), pageRequest, total);
+        }
         return criteria.query() == null
                 ? expenseRequestRepository.findOwnPageWithoutQuery(
                         applicantId, criteria.status(), criteria.category(), criteria.fromDate(),
@@ -136,13 +149,21 @@ public class ExpenseService {
         requireApprover(currentUser);
         PageRequest pageRequest = PageRequest.of(pageNumber, PAGE_SIZE,
                 Sort.by(Sort.Order.asc("submittedAt"), Sort.Order.asc("id")));
-        Page<ExpenseRequest> requests = expenseRequestRepository.findApprovalPage(
-                currentUser.departmentId(), currentUser.id(), ExpenseStatus.SUBMITTED, pageRequest);
+        Page<ExpenseRequest> requests;
+        if (pageRequest.getOffset() > Integer.MAX_VALUE) {
+            long total = expenseRequestRepository.findApprovalPage(
+                    currentUser.departmentId(), currentUser.id(), ExpenseStatus.SUBMITTED,
+                    PageRequest.of(0, 1, pageRequest.getSort())).getTotalElements();
+            requests = new PageImpl<>(List.of(), pageRequest, total);
+        } else {
+            requests = expenseRequestRepository.findApprovalPage(
+                    currentUser.departmentId(), currentUser.id(), ExpenseStatus.SUBMITTED, pageRequest);
+        }
         List<ApprovalListItem> items = requests.getContent().stream()
                 .map(this::toApprovalListItem)
                 .toList();
         return new ApprovalListPage(items, requests.getTotalElements(), requests.getTotalPages(),
-                requests.getNumber(), requests.hasPrevious(), requests.hasNext());
+                requests.getNumber(), requests.hasPrevious(), hasNextPage(requests));
     }
 
     @Transactional(readOnly = true)
